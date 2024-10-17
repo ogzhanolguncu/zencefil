@@ -19,12 +19,7 @@ func main() {
 	// 			{{ else }}
 	// 			You are not an admin.
 	// 			{{ endif }}`
-	content := `Hello, {{ name }}!
-				{{ if is_admin }}
-				You are an admin.
-				{{ else }}
-				You are not an admin.
-				{{ endif }}`
-
-	fmt.Printf("%+v", parser.New(lexer.New(content).Tokenize()).Parse(""))
+	content := `Hello, {{ if is_admin }} You are an admin. {{ else }} You are not an admin. {{ endif }}`
+	ast, _ := parser.New(lexer.New(content).Tokenize()).Parse()
+	fmt.Printf("%+v", ast)
 }
