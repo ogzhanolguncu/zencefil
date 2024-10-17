@@ -8,11 +8,13 @@ import (
 )
 
 var keywords = map[string]bool{
-	"if":   true,
-	"else": true,
-	"for":  true,
-	"in":   true,
-	"end":  true,
+	"if":     true,
+	"elif":   true,
+	"else":   true,
+	"for":    true,
+	"in":     true,
+	"endif":  true,
+	"endfor": true,
 }
 
 type ReadMode int
@@ -49,7 +51,7 @@ type Lexer struct {
 	mode            ReadMode
 }
 
-func NewLexer(content string) *Lexer {
+func New(content string) *Lexer {
 	return &Lexer{
 		currentPosition: 0,
 		Tokens:          nil,

@@ -7,8 +7,8 @@ import (
 )
 
 func TestLexer(t *testing.T) {
-	content := "Hello, {{ name }}! {{ if is_admin }} You are an admin.{{ end }}"
-	tokens := NewLexer(content).Tokenize()
+	content := "Hello, {{ name }}! {{ if is_admin }} You are an admin.{{ endif }}"
+	tokens := New(content).Tokenize()
 
 	expected := []Token{
 		{Type: TEXT, Value: "Hello, "},
@@ -22,7 +22,7 @@ func TestLexer(t *testing.T) {
 		{Type: CLOSE_CURLY, Value: "}}"},
 		{Type: TEXT, Value: " You are an admin."},
 		{Type: OPEN_CURLY, Value: "{{"},
-		{Type: KEYWORD, Value: "end"},
+		{Type: KEYWORD, Value: "endif"},
 		{Type: CLOSE_CURLY, Value: "}}"},
 	}
 
@@ -38,16 +38,16 @@ func TestMoreComplexLexer(t *testing.T) {
 	 <ul>
 	 {{ for task in tasks }}
 	  <li>{{ task }}</li>
-	 {{ end }}
+	 {{ endfor }}
 	   </ul>
 	   {{ else }}
 		<p>Please log in to see your tasks.</p>
-	{{ end }}
+	{{ endif }}
 		<footer>Copyright {{ year }}</footer>
 	</body>
 	</html>
 	`
-	tokens := NewLexer(content).Tokenize()
+	tokens := New(content).Tokenize()
 
 	expected := []Token{
 		{Type: TEXT, Value: "\n\t<html>\n\t<body>\n\t<h1>Welcome, "},
@@ -72,7 +72,7 @@ func TestMoreComplexLexer(t *testing.T) {
 		{Type: CLOSE_CURLY, Value: "}}"},
 		{Type: TEXT, Value: "</li>\n\t "},
 		{Type: OPEN_CURLY, Value: "{{"},
-		{Type: KEYWORD, Value: "end"},
+		{Type: KEYWORD, Value: "endfor"},
 		{Type: CLOSE_CURLY, Value: "}}"},
 		{Type: TEXT, Value: "\n\t   </ul>\n\t   "},
 		{Type: OPEN_CURLY, Value: "{{"},
@@ -80,7 +80,7 @@ func TestMoreComplexLexer(t *testing.T) {
 		{Type: CLOSE_CURLY, Value: "}}"},
 		{Type: TEXT, Value: "\n\t\t<p>Please log in to see your tasks.</p>\n\t"},
 		{Type: OPEN_CURLY, Value: "{{"},
-		{Type: KEYWORD, Value: "end"},
+		{Type: KEYWORD, Value: "endif"},
 		{Type: CLOSE_CURLY, Value: "}}"},
 		{Type: TEXT, Value: "\n\t\t<footer>Copyright "},
 		{Type: OPEN_CURLY, Value: "{{"},
