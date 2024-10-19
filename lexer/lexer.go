@@ -1,7 +1,6 @@
 package lexer
 
 import (
-	"fmt"
 	"log"
 	"strings"
 	"unicode"
@@ -32,6 +31,7 @@ const (
 	CLOSE_CURLY
 	IDENTIFIER
 	KEYWORD
+	WHITESPACE
 )
 
 // Lets us pretify the enums when printing
@@ -45,18 +45,18 @@ type Token struct {
 }
 
 type Lexer struct {
-	Tokens          []Token
-	currentPosition int
-	rawText         string
-	mode            ReadMode
+	Tokens  []Token
+	crrPos  int
+	rawText string
+	mode    ReadMode
 }
 
 func New(content string) *Lexer {
 	return &Lexer{
-		currentPosition: 0,
-		Tokens:          nil,
-		rawText:         content,
-		mode:            TextMode,
+		crrPos:  0,
+		Tokens:  nil,
+		rawText: content,
+		mode:    TextMode,
 	}
 }
 
@@ -68,7 +68,6 @@ func (l *Lexer) Tokenize() []Token {
 	for {
 		char, ok := l.advance()
 		if !ok {
-			fmt.Printf("Consumed the entire content...\n")
 			break // End of input
 		}
 
@@ -78,14 +77,14 @@ func (l *Lexer) Tokenize() []Token {
 				peek, _ := l.peek()
 				if peek == '{' {
 					//Append literal
-					l.emitToken(sb, TEXT)
+					l.addToken(sb, TEXT)
 					sb.Reset()
 
 					//Append openning tag
 					l.advance() // consume the second '}'
 					var sbAlt strings.Builder
 					sbAlt.WriteString("{{")
-					l.emitToken(sbAlt, OPEN_CURLY)
+					l.addToken(sbAlt, OPEN_CURLY)
 
 					//Switch to tag mode
 					l.switchMode()
@@ -98,9 +97,9 @@ func (l *Lexer) Tokenize() []Token {
 			if unicode.IsSpace(char) {
 				if sb.Len() > 0 {
 					if isKeyword(sb.String()) {
-						l.emitToken(sb, KEYWORD)
+						l.addToken(sb, KEYWORD)
 					} else {
-						l.emitToken(sb, IDENTIFIER)
+						l.addToken(sb, IDENTIFIER)
 					}
 					sb.Reset()
 				}
@@ -110,9 +109,9 @@ func (l *Lexer) Tokenize() []Token {
 				if peek == '}' {
 					if sb.Len() > 0 {
 						if isKeyword(sb.String()) {
-							l.emitToken(sb, KEYWORD)
+							l.addToken(sb, KEYWORD)
 						} else {
-							l.emitToken(sb, IDENTIFIER)
+							l.addToken(sb, IDENTIFIER)
 						}
 						sb.Reset()
 					}
@@ -120,7 +119,7 @@ func (l *Lexer) Tokenize() []Token {
 					l.advance() // consume the second '}'
 					var sbAlt strings.Builder
 					sbAlt.WriteString("}}")
-					l.emitToken(sbAlt, CLOSE_CURLY)
+					l.addToken(sbAlt, CLOSE_CURLY)
 
 					//Switch to text mode
 					l.switchMode()
@@ -138,14 +137,14 @@ func (l *Lexer) Tokenize() []Token {
 	// Emit any remaining text
 	if sb.Len() > 0 {
 		if l.mode == TextMode {
-			l.emitToken(sb, TEXT)
+			l.addToken(sb, TEXT)
 		} else {
 			// Handle unclosed tag
 			log.Printf("Warning: Unclosed tag at end of input")
 			if isKeyword(sb.String()) {
-				l.emitToken(sb, KEYWORD)
+				l.addToken(sb, KEYWORD)
 			} else {
-				l.emitToken(sb, IDENTIFIER)
+				l.addToken(sb, IDENTIFIER)
 			}
 		}
 	}
@@ -163,25 +162,29 @@ func (l *Lexer) switchMode() {
 
 // Consumes a char
 func (l *Lexer) advance() (rune, bool) {
-	if l.currentPosition >= len(l.rawText) {
+	if l.crrPos >= len(l.rawText) {
 		return 0, false
 	}
-	r := rune(l.rawText[l.currentPosition])
-	l.currentPosition++
+	r := rune(l.rawText[l.crrPos])
+	l.crrPos++
 	return r, true
 }
 
 // Checks a char without consuming it
 func (l *Lexer) peek() (rune, bool) {
-	if l.currentPosition >= len(l.rawText) {
+	if l.crrPos >= len(l.rawText) {
 		return 0, false
 	}
-	return rune(l.rawText[l.currentPosition]), true
+	return rune(l.rawText[l.crrPos]), true
 }
 
 // Adds token to token slice
-func (l *Lexer) emitToken(value strings.Builder, tokenType TokenType) {
-	l.Tokens = append(l.Tokens, Token{Value: value.String(), Type: tokenType})
+func (l *Lexer) addToken(value strings.Builder, tokenType TokenType) {
+	if tokenType == TEXT && strings.TrimSpace(value.String()) == "" {
+		l.Tokens = append(l.Tokens, Token{Value: value.String(), Type: WHITESPACE})
+	} else {
+		l.Tokens = append(l.Tokens, Token{Value: value.String(), Type: tokenType})
+	}
 }
 
 // ----- Helper Functions -----

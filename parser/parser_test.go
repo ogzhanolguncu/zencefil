@@ -8,32 +8,79 @@ import (
 )
 
 func TestParser(t *testing.T) {
-	content := "Hello, {{ if is_admin }} You are an admin. {{ endif }}"
-	ast, err := New(lexer.New(content).Tokenize()).Parse()
-	require.NoError(t, err)
-	expectedAST := []Node{
-		{Type: TextNode, Value: "Hello, ", Children: []Node(nil)},
-		{Type: IfNode, Value: "is_admin", Children: []Node{
-			{Type: TextNode, Value: " You are an admin. ", Children: []Node(nil)},
-		}},
-	}
-	require.Equal(t, expectedAST, ast)
-}
-
-func TestParserWithIfElse(t *testing.T) {
-	content := "Hello, {{ if is_admin }} You are an admin. {{ else }} You are not an admin. {{ endif }}"
-	ast, err := New(lexer.New(content).Tokenize()).Parse()
-	require.NoError(t, err)
-	expectedAST := []Node{
-		{Type: TextNode, Value: "Hello, ", Children: []Node(nil)},
+	tests := []struct {
+		name             string
+		content          string
+		expected         []Node
+		allowPrettyPrint bool
+	}{
 		{
-			Type:  IfNode,
-			Value: "is_admin",
-			Children: []Node{
-				{Type: TextNode, Value: " You are an admin. ", Children: []Node(nil)},
-				{Type: TextNode, Value: " You are not an admin. ", Children: []Node(nil)},
+			name:    "Simple if statement",
+			content: "Hello, {{ if is_admin }} You are an admin. {{ endif }}",
+			expected: []Node{
+				{Type: TEXT_NODE, Value: "Hello, "},
+				{Type: IF_NODE, Value: "is_admin", Children: []Node{
+					{Type: TEXT_NODE, Value: " You are an admin. "},
+				}},
 			},
 		},
+		{
+			name:    "If-else statement",
+			content: "Hello, {{ if is_admin }} You are an admin. {{ else }} You are not an admin. {{ endif }}",
+			expected: []Node{
+				{Type: TEXT_NODE, Value: "Hello, "},
+				{
+					Type:  IF_NODE,
+					Value: "is_admin",
+					Children: []Node{
+						{Type: TEXT_NODE, Value: " You are an admin. "},
+						{Type: TEXT_NODE, Value: " You are not an admin. "},
+					},
+				},
+			},
+		},
+		{
+			name:    "If-else statement",
+			content: `Hello, {{ if is_admin }} You are an admin. {{ if is_super_admin}} SuperAdminIsComing {{ if is_super_super_admin}} Yessssss! {{endif}} {{endif}} {{ else }} You are not an admin. {{ endif }}`,
+			expected: []Node{
+				{Type: TEXT_NODE, Value: "Hello, "},
+				{
+					Type:  IF_NODE,
+					Value: "is_admin",
+					Children: []Node{
+						{Type: TEXT_NODE, Value: " You are an admin. "},
+						{
+							Type:  IF_NODE,
+							Value: "is_super_admin",
+							Children: []Node{
+								{Type: TEXT_NODE, Value: " SuperAdminIsComing "},
+								{
+									Type:  IF_NODE,
+									Value: "is_super_super_admin",
+									Children: []Node{
+										{Type: TEXT_NODE, Value: " Yessssss! "},
+									},
+								},
+								{Type: WHITESPACE_NODE, Value: " "},
+							},
+						},
+						{Type: WHITESPACE_NODE, Value: " "},
+						{Type: TEXT_NODE, Value: " You are not an admin. "},
+					},
+				},
+			},
+			allowPrettyPrint: true,
+		},
 	}
-	require.Equal(t, expectedAST, ast)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ast, err := New(lexer.New(tt.content).Tokenize()).Parse()
+			if tt.allowPrettyPrint {
+				PrettifyAST(ast)
+			}
+			require.NoError(t, err)
+			require.Equal(t, tt.expected, ast)
+		})
+	}
 }
