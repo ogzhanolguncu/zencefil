@@ -49,7 +49,13 @@ func New(tokens []lexer.Token) *Parser {
 func (p *Parser) Parse() ([]Node, error) {
 	var nodes []Node
 
-	for !p.isAtEnd() && !p.isBlockEnd() {
+	for {
+		if p.isAtEnd() {
+			return nodes, nil
+		}
+		if p.isBlockEnd() {
+			return nil, fmt.Errorf("malformed tokens. 'else' or 'endif' cannot be used without 'if'")
+		}
 		if p.match(lexer.TEXT) {
 			nodes = append(nodes, NewNode(TEXT_NODE, p.previous().Value))
 		} else if p.match(lexer.WHITESPACE) {
@@ -70,9 +76,17 @@ func (p *Parser) Parse() ([]Node, error) {
 			return nil, fmt.Errorf("unrecognized token: %v, they should start with -> '{{'", p.peek())
 		}
 	}
-	return nodes, nil
 }
 
+// parseIf parses an if-else construct in the template.
+// It handles:
+//  1. The condition of the if statement
+//  2. The 'then' block, which may contain nested templates
+//  3. An optional 'else' block, also potentially containing nested templates
+//  4. The 'endif' terminator
+//
+// Each block is parsed as a separate template, allowing for nested if-else constructs.
+// Returns a Node representing the entire if-else structure.
 func (p *Parser) parseIf() (Node, error) {
 	condition, err := p.expectIfIdentifier()
 	if err != nil {
