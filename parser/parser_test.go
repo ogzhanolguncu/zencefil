@@ -17,12 +17,16 @@ func TestParser(t *testing.T) {
 	}{
 		{
 			name:    "Simple if statement",
-			content: "Hello, {{ if is_admin }} You are an admin. {{ endif }}",
+			content: "Hello, {{ name }}! {{ if is_admin }} You are an admin.{{ endif }} {{ surname }}",
 			expected: []Node{
 				{Type: TEXT_NODE, Value: "Hello, "},
+				{Type: VARIABLE_NODE, Value: "name"},
+				{Type: TEXT_NODE, Value: "! "},
 				{Type: IF_NODE, Value: "is_admin", Children: []Node{
-					{Type: TEXT_NODE, Value: " You are an admin. "},
+					{Type: TEXT_NODE, Value: " You are an admin."},
 				}},
+				{Type: WHITESPACE_NODE, Value: " "},
+				{Type: VARIABLE_NODE, Value: "surname"},
 			},
 		},
 		{

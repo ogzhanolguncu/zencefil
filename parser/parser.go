@@ -68,6 +68,9 @@ func (p *Parser) Parse() ([]Node, error) {
 					return nil, fmt.Errorf("error parsing if statement: %w", err)
 				}
 				nodes = append(nodes, IfNode)
+			} else if p.match(lexer.IDENTIFIER) {
+				nodes = append(nodes, NewNode(VARIABLE_NODE, p.previous().Value))
+				p.advance() // consume '}}' of variable node
 			} else {
 				// TODO: Later this will also handle 'for' and 'identifier' token
 				return nil, fmt.Errorf("unexpected token after '{{': %v", p.peek())
@@ -137,8 +140,11 @@ func (p *Parser) parseBlock() ([]Node, error) {
 					return nil, fmt.Errorf("error parsing nested if statement: %w", err)
 				}
 				nodes = append(nodes, ifNode)
+			} else if p.match(lexer.IDENTIFIER) {
+				nodes = append(nodes, NewNode(VARIABLE_NODE, p.previous().Value))
+				p.advance() // consume '}}' of variable node
 			} else {
-				// TODO: Later this will also handle 'for' and 'identifier' token
+				// TODO: Later this will also handle 'for'  token
 				return nil, fmt.Errorf("unexpected token after '{{': %v", p.peek())
 			}
 		} else {
