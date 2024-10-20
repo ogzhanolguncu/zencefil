@@ -30,6 +30,49 @@ func TestParser(t *testing.T) {
 			},
 		},
 		{
+			name: "Simple if-elseif-else statement",
+			content: `Hello, {{ name }}!
+			{{ if is_admin }}
+			 	You are an admin.
+			{{ elif is_super_admin }}
+			  {{ if wohoo }}
+				You are a super admin.
+			  {{ else }}
+			  	Whooot?
+			   {{ endif}}
+			{{ elif is_oz }}
+				You are an oz.
+			{{ elif is_dobby }}
+				You are a super dobby.
+			{{ else }}
+				You are no body.
+			{{endif}}`,
+			expected: []Node{
+				{Type: 0, Value: "Hello, ", Children: nil},
+				{Type: 1, Value: "name", Children: nil},
+				{Type: 0, Value: "!\n\t\t\t", Children: nil},
+				{Type: 2, Value: "is_admin", Children: []Node{
+					{Type: 0, Value: "\n\t\t\t \tYou are an admin.\n\t\t\t", Children: nil},
+					{Type: 3, Value: "is_super_admin", Children: []Node{
+						{Type: 5, Value: "\n\t\t\t  ", Children: nil},
+						{Type: 2, Value: "wohoo", Children: []Node{
+							{Type: 0, Value: "\n\t\t\t\tYou are a super admin.\n\t\t\t  ", Children: nil},
+							{Type: 0, Value: "\n\t\t\t  \tWhooot?\n\t\t\t   ", Children: nil},
+						}},
+						{Type: 5, Value: "\n\t\t\t", Children: nil},
+					}},
+					{Type: 3, Value: "is_oz", Children: []Node{
+						{Type: 0, Value: "\n\t\t\t\tYou are an oz.\n\t\t\t", Children: nil},
+					}},
+					{Type: 3, Value: "is_dobby", Children: []Node{
+						{Type: 0, Value: "\n\t\t\t\tYou are a super dobby.\n\t\t\t", Children: nil},
+					}},
+					{Type: 0, Value: "\n\t\t\t\tYou are no body.\n\t\t\t", Children: nil},
+				}},
+			},
+			allowPrettyPrint: true,
+		},
+		{
 			name:             "Malformed template starting with 'endif' without 'if'",
 			content:          "Hello, {{ endif }} asdasd",
 			shouldError:      true,

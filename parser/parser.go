@@ -14,12 +14,17 @@ const (
 	TEXT_NODE NodeType = iota
 	VARIABLE_NODE
 	IF_NODE
+	ELIF_NODE
+	ELSE_NODE
 	FOR_NODE
 	WHITESPACE_NODE
+	FOR_ITERATOR_NODE
+	FOR_ITERABLE_NODE
+	FOR_BODY_NODE
 )
 
 func (tt NodeType) String() string {
-	return [...]string{"TextNode", "VariableNode", "IfNode", "ForNode", "WhitespaceNode"}[tt]
+	return [...]string{"TextNode", "VariableNode", "IfNode", "ElifNode", "ForNode", "WhitespaceNode"}[tt]
 }
 
 type Node struct {
@@ -32,7 +37,8 @@ func NewNode(nodeType NodeType, value string, children ...Node) Node {
 	return Node{
 		Type:     nodeType,
 		Value:    value,
-		Children: children}
+		Children: children,
+	}
 }
 
 type Parser struct {
@@ -105,15 +111,18 @@ func (p *Parser) parseIf() (Node, error) {
 		return Node{}, fmt.Errorf("error parsing then block: %w", err)
 	}
 
+	var elifNodes []Node
+	for p.isElifKeyword() {
+		elifNode, err := p.parseElif()
+		if err != nil {
+			return Node{}, fmt.Errorf("error parsing elif block: %w", err)
+		}
+		elifNodes = append(elifNodes, elifNode)
+	}
+
 	var elseBlock []Node
 	if p.isElseKeyword() {
-		// Consume the '{{else}}' tokens
-		p.advance() // {{
-		p.advance() // else
-		if err := p.expectCloseCurly(); err != nil {
-			return Node{}, err
-		}
-		elseBlock, err = p.parseBlock()
+		elseBlock, err = p.parseElse()
 		if err != nil {
 			return Node{}, fmt.Errorf("error parsing else block: %w", err)
 		}
@@ -122,7 +131,45 @@ func (p *Parser) parseIf() (Node, error) {
 	if err := p.expectAndConsumeEndIf(); err != nil {
 		return Node{}, err
 	}
-	return NewNode(IF_NODE, condition, append(thenBlock, elseBlock...)...), nil
+
+	allChildren := append(thenBlock, elifNodes...)
+	allChildren = append(allChildren, elseBlock...)
+
+	return NewNode(IF_NODE, condition, allChildren...), nil
+}
+
+func (p *Parser) parseElse() ([]Node, error) {
+	p.advance()
+	p.advance()
+	if err := p.expectCloseCurly(); err != nil {
+		return []Node{}, err
+	}
+	elseBlock, err := p.parseBlock()
+	if err != nil {
+		return []Node{}, err
+	}
+	return elseBlock, nil
+}
+
+func (p *Parser) parseElif() (Node, error) {
+	p.advance() // {{
+	p.advance() // elif
+
+	condition, err := p.expectIfIdentifier()
+	if err != nil {
+		return Node{}, err
+	}
+
+	if err := p.expectCloseCurly(); err != nil {
+		return Node{}, err
+	}
+
+	block, err := p.parseBlock()
+	if err != nil {
+		return Node{}, fmt.Errorf("error parsing elif block: %w", err)
+	}
+
+	return NewNode(ELIF_NODE, condition, block...), nil
 }
 
 func (p *Parser) parseBlock() ([]Node, error) {
@@ -134,12 +181,19 @@ func (p *Parser) parseBlock() ([]Node, error) {
 		} else if p.match(lexer.WHITESPACE) {
 			nodes = append(nodes, NewNode(WHITESPACE_NODE, p.previous().Value))
 		} else if p.match(lexer.OPEN_CURLY) {
-			if p.match(lexer.KEYWORD) && p.previous().Value == "if" {
-				ifNode, err := p.parseIf()
-				if err != nil {
-					return nil, fmt.Errorf("error parsing nested if statement: %w", err)
+			if p.match(lexer.KEYWORD) {
+				switch p.previous().Value {
+				case "if":
+					ifNode, err := p.parseIf()
+					if err != nil {
+						return nil, fmt.Errorf("error parsing nested if statement: %w", err)
+					}
+					nodes = append(nodes, ifNode)
+				case "for":
+					//TODO: handle later
+				default:
+					panic("Unknown KEYWORD")
 				}
-				nodes = append(nodes, ifNode)
 			} else if p.match(lexer.IDENTIFIER) {
 				nodes = append(nodes, NewNode(VARIABLE_NODE, p.previous().Value))
 				p.advance() // consume '}}' of variable node
@@ -155,7 +209,11 @@ func (p *Parser) parseBlock() ([]Node, error) {
 }
 
 func (p *Parser) isBlockEnd() bool {
-	return p.isElseKeyword() || p.isEndIfKeyword()
+	return p.isElseKeyword() || p.isElifKeyword() || p.isEndIfKeyword()
+}
+
+func (p *Parser) isElifKeyword() bool {
+	return p.check(lexer.OPEN_CURLY) && p.checkNext(lexer.KEYWORD) && p.tokens[p.crrPos+1].Value == "elif"
 }
 
 func (p *Parser) isElseKeyword() bool {
@@ -261,6 +319,8 @@ func prettifyNodes(sb *strings.Builder, nodes []Node, indent int) {
 		case VARIABLE_NODE:
 			nodeValueColor = color.New(color.FgYellow).SprintFunc()
 		case IF_NODE:
+			nodeValueColor = color.New(color.FgMagenta).SprintFunc()
+		case ELIF_NODE:
 			nodeValueColor = color.New(color.FgMagenta).SprintFunc()
 		case FOR_NODE:
 			nodeValueColor = color.New(color.FgBlue).SprintFunc()
