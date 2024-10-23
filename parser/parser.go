@@ -13,26 +13,54 @@ type NodeType int
 const (
 	TEXT_NODE NodeType = iota
 	VARIABLE_NODE
+
 	IF_NODE
-	ELIF_NODE
+	THEN_BRANCH
+	ELIF_BRANCH
+	ELIF_ITEM
+	ELSE_BRANCH
+
 	FOR_NODE
 	WHITESPACE_NODE
 )
 
 func (tt NodeType) String() string {
-	return [...]string{"TEXT_NODE", "VARIABLE_NODE", "IF_NODE", "ELIF_NODE", "FOR_NODE", "WHITESPACE_NODE"}[tt]
+	return [...]string{"TEXT_NODE", "VARIABLE_NODE", "IF_NODE", "THEN_BRANCH", "ELIF_BRANCH", "ELIF_ITEM", "ELSE_BRANCH", "FOR_NODE", "WHITESPACE_NODE"}[tt]
 }
 
 type Node struct {
 	Type     NodeType
-	Value    string
+	Value    *string
 	Children []Node
 }
 
-func NewNode(nodeType NodeType, value string, children ...Node) Node {
+func NewNode(nodeType NodeType, value *string, children ...Node) Node {
 	return Node{
 		Type:     nodeType,
 		Value:    value,
+		Children: children,
+	}
+}
+
+func NewIfNode(condition *string, thenBranch, elifBranch, elseBranch Node) Node {
+	var children []Node
+
+	// Add THEN_BRANCH even if empty
+	children = append(children, NewNode(THEN_BRANCH, nil, thenBranch.Children...))
+
+	// Add ELIF_BRANCH if it has children
+	if len(elifBranch.Children) > 0 {
+		children = append(children, elifBranch)
+	}
+
+	// Add ELSE_BRANCH even if empty
+	if len(elseBranch.Children) > 0 {
+		children = append(children, NewNode(ELSE_BRANCH, nil, elseBranch.Children...))
+	}
+
+	return Node{
+		Type:     IF_NODE,
+		Value:    condition,
 		Children: children,
 	}
 }
@@ -59,10 +87,12 @@ func (p *Parser) Parse() ([]Node, error) {
 			return nil, fmt.Errorf("malformed tokens. 'else' or 'endif' cannot be used without 'if'")
 		}
 		if p.match(lexer.TEXT) {
-			nodes = append(nodes, NewNode(TEXT_NODE, p.previous().Value))
+			prevVal := p.previous().Value
+			nodes = append(nodes, NewNode(TEXT_NODE, &prevVal))
 		} else if p.match(lexer.WHITESPACE) {
 			// TODO: If there are more than one space I should count them as one.
-			nodes = append(nodes, NewNode(WHITESPACE_NODE, p.previous().Value))
+			prevVal := p.previous().Value
+			nodes = append(nodes, NewNode(WHITESPACE_NODE, &prevVal))
 		} else if p.match(lexer.OPEN_CURLY) {
 			if p.match(lexer.KEYWORD) && p.previous().Value == "if" {
 				IfNode, err := p.parseIf()
@@ -71,7 +101,8 @@ func (p *Parser) Parse() ([]Node, error) {
 				}
 				nodes = append(nodes, IfNode)
 			} else if p.match(lexer.IDENTIFIER) {
-				nodes = append(nodes, NewNode(VARIABLE_NODE, p.previous().Value))
+				prevVal := p.previous().Value
+				nodes = append(nodes, NewNode(VARIABLE_NODE, &prevVal))
 				p.advance() // consume '}}' of variable node
 			} else {
 				// TODO: Later this will also handle 'for' and 'identifier' token
@@ -116,7 +147,7 @@ func (p *Parser) parseIf() (Node, error) {
 		elifNodes = append(elifNodes, elifNode)
 	}
 
-	var elseBlock []Node
+	var elseBlock Node
 	if p.isElseKeyword() {
 		elseBlock, err = p.parseElse()
 		if err != nil {
@@ -128,23 +159,23 @@ func (p *Parser) parseIf() (Node, error) {
 		return Node{}, err
 	}
 
-	allChildren := append(thenBlock, elifNodes...)
-	allChildren = append(allChildren, elseBlock...)
-
-	return NewNode(IF_NODE, condition, allChildren...), nil
+	return NewIfNode(&condition,
+		NewNode(THEN_BRANCH, nil, thenBlock...),
+		NewNode(ELIF_BRANCH, nil, elifNodes...),
+		elseBlock), nil
 }
 
-func (p *Parser) parseElse() ([]Node, error) {
+func (p *Parser) parseElse() (Node, error) {
 	p.advance()
 	p.advance()
 	if err := p.expectCloseCurly(); err != nil {
-		return []Node{}, err
+		return Node{}, err
 	}
 	elseBlock, err := p.parseBlock()
 	if err != nil {
-		return []Node{}, err
+		return Node{}, err
 	}
-	return elseBlock, nil
+	return NewNode(ELSE_BRANCH, nil, elseBlock...), nil
 }
 
 func (p *Parser) parseElif() (Node, error) {
@@ -165,7 +196,7 @@ func (p *Parser) parseElif() (Node, error) {
 		return Node{}, fmt.Errorf("error parsing elif block: %w", err)
 	}
 
-	return NewNode(ELIF_NODE, condition, block...), nil
+	return NewNode(ELIF_ITEM, &condition, block...), nil
 }
 
 func (p *Parser) parseBlock() ([]Node, error) {
@@ -173,9 +204,12 @@ func (p *Parser) parseBlock() ([]Node, error) {
 
 	for !p.isAtEnd() && !p.isBlockEnd() {
 		if p.match(lexer.TEXT) {
-			nodes = append(nodes, NewNode(TEXT_NODE, p.previous().Value))
+
+			prevVal := p.previous().Value
+			nodes = append(nodes, NewNode(TEXT_NODE, &prevVal))
 		} else if p.match(lexer.WHITESPACE) {
-			nodes = append(nodes, NewNode(WHITESPACE_NODE, p.previous().Value))
+			prevVal := p.previous().Value
+			nodes = append(nodes, NewNode(WHITESPACE_NODE, &prevVal))
 		} else if p.match(lexer.OPEN_CURLY) {
 			if p.match(lexer.KEYWORD) {
 				switch p.previous().Value {
@@ -191,7 +225,8 @@ func (p *Parser) parseBlock() ([]Node, error) {
 					panic("Unknown KEYWORD")
 				}
 			} else if p.match(lexer.IDENTIFIER) {
-				nodes = append(nodes, NewNode(VARIABLE_NODE, p.previous().Value))
+				prevVal := p.previous().Value
+				nodes = append(nodes, NewNode(VARIABLE_NODE, &prevVal))
 				p.advance() // consume '}}' of variable node
 			} else {
 				// TODO: Later this will also handle 'for'  token
@@ -316,7 +351,13 @@ func prettifyNodes(sb *strings.Builder, nodes []Node, indent int) {
 			nodeValueColor = color.New(color.FgYellow).SprintFunc()
 		case IF_NODE:
 			nodeValueColor = color.New(color.FgMagenta).SprintFunc()
-		case ELIF_NODE:
+		case THEN_BRANCH:
+			nodeValueColor = color.New(color.FgMagenta).SprintFunc()
+		case ELIF_BRANCH:
+			nodeValueColor = color.New(color.FgMagenta).SprintFunc()
+		case ELIF_ITEM:
+			nodeValueColor = color.New(color.FgHiCyan).SprintFunc()
+		case ELSE_BRANCH:
 			nodeValueColor = color.New(color.FgMagenta).SprintFunc()
 		case FOR_NODE:
 			nodeValueColor = color.New(color.FgBlue).SprintFunc()
@@ -326,9 +367,14 @@ func prettifyNodes(sb *strings.Builder, nodes []Node, indent int) {
 			nodeValueColor = color.New(color.FgWhite).SprintFunc()
 		}
 
-		sb.WriteString(fmt.Sprintf("%s: %s\n",
-			nodeTypeColor(node.Type),
-			nodeValueColor(strings.ReplaceAll(strings.ReplaceAll(node.Value, "\n", "\\n"), "\t", "\\t"))))
+		// Always print the node type
+		if node.Value != nil {
+			sb.WriteString(fmt.Sprintf("%s: %s\n",
+				nodeTypeColor(node.Type),
+				nodeValueColor(strings.ReplaceAll(strings.ReplaceAll(*node.Value, "\n", "\\n"), "\t", "\\t"))))
+		} else {
+			sb.WriteString(fmt.Sprintf("%s: \n", nodeTypeColor(node.Type)))
+		}
 
 		if len(node.Children) > 0 {
 			prettifyNodes(sb, node.Children, indent+1)

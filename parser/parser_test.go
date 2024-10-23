@@ -19,127 +19,103 @@ func TestParser(t *testing.T) {
 			name:    "Simple if statement",
 			content: "Hello, {{ name }}! {{ if is_admin }} You are an admin.{{ endif }} {{ surname }}",
 			expected: []Node{
-				{Type: TEXT_NODE, Value: "Hello, "},
-				{Type: VARIABLE_NODE, Value: "name"},
-				{Type: TEXT_NODE, Value: "! "},
-				{Type: IF_NODE, Value: "is_admin", Children: []Node{
-					{Type: TEXT_NODE, Value: " You are an admin."},
+				{Type: TEXT_NODE, Value: ptrStr("Hello, ")},
+				{Type: VARIABLE_NODE, Value: ptrStr("name")},
+				{Type: TEXT_NODE, Value: ptrStr("! ")},
+				{Type: IF_NODE, Value: ptrStr("is_admin"), Children: []Node{
+					{Type: THEN_BRANCH, Value: nil, Children: []Node{
+						{Type: TEXT_NODE, Value: ptrStr(" You are an admin.")},
+					}},
 				}},
-				{Type: WHITESPACE_NODE, Value: " "},
-				{Type: VARIABLE_NODE, Value: "surname"},
+				{Type: WHITESPACE_NODE, Value: ptrStr(" ")},
+				{Type: VARIABLE_NODE, Value: ptrStr("surname")},
 			},
 		},
 		{
-			name: "Simple if-elseif-else statement",
-			content: `Hello, {{ name }}!
-			{{ if is_admin }}
-			You are an admin.
-			{{ elif is_super_admin }}
-			  {{ if wohoo }}
-				You are a super admin.
-			  {{ else }}
-			  	Whooot?
-			   {{ endif}}
-			{{ elif is_oz }}
-				You are an oz.
-			{{ elif is_dobby }}
-				You are a super dobby.
-			{{ else }}
-				You are no body.
-			{{endif}}`,
+			name:    "Simple if-elseif-else statement",
+			content: "Hello {{ if is_admin }}admin{{ elif is_super }}super{{ elif is_user }}user{{ else }}guest{{ endif }}!",
 			expected: []Node{
-				{Type: 0, Value: "Hello, ", Children: nil},
-				{Type: 1, Value: "name", Children: nil},
-				{Type: 0, Value: "!\n\t\t\t", Children: nil},
-				{Type: 2, Value: "is_admin", Children: []Node{
-					{Type: 0, Value: "\n\t\t\tYou are an admin.\n\t\t\t", Children: nil},
-					{Type: 3, Value: "is_super_admin", Children: []Node{
-						{Type: 5, Value: "\n\t\t\t  ", Children: nil},
-						{Type: 2, Value: "wohoo", Children: []Node{
-							{Type: 0, Value: "\n\t\t\t\tYou are a super admin.\n\t\t\t  ", Children: nil},
-							{Type: 0, Value: "\n\t\t\t  \tWhooot?\n\t\t\t   ", Children: nil},
+				{Type: TEXT_NODE, Value: ptrStr("Hello ")},
+				{Type: IF_NODE, Value: ptrStr("is_admin"), Children: []Node{
+					{Type: THEN_BRANCH, Value: nil, Children: []Node{
+						{Type: TEXT_NODE, Value: ptrStr("admin")},
+					}},
+					{Type: ELIF_BRANCH, Value: nil, Children: []Node{
+						{Type: ELIF_ITEM, Value: ptrStr("is_super"), Children: []Node{
+							{Type: TEXT_NODE, Value: ptrStr("super")},
 						}},
-						{Type: 5, Value: "\n\t\t\t", Children: nil},
+						{Type: ELIF_ITEM, Value: ptrStr("is_user"), Children: []Node{
+							{Type: TEXT_NODE, Value: ptrStr("user")},
+						}},
 					}},
-					{Type: 3, Value: "is_oz", Children: []Node{
-						{Type: 0, Value: "\n\t\t\t\tYou are an oz.\n\t\t\t", Children: nil},
+					{Type: ELSE_BRANCH, Value: nil, Children: []Node{
+						{Type: TEXT_NODE, Value: ptrStr("guest")},
 					}},
-					{Type: 3, Value: "is_dobby", Children: []Node{
-						{Type: 0, Value: "\n\t\t\t\tYou are a super dobby.\n\t\t\t", Children: nil},
-					}},
-					{Type: 0, Value: "\n\t\t\t\tYou are no body.\n\t\t\t", Children: nil},
 				}},
+				{Type: TEXT_NODE, Value: ptrStr("!")},
 			},
 			allowPrettyPrint: true,
 		},
 		{
-			name:             "Malformed template starting with 'endif' without 'if'",
-			content:          "Hello, {{ endif }} asdasd",
-			shouldError:      true,
-			allowPrettyPrint: true,
+			name:        "Malformed template starting with 'endif' without 'if'",
+			content:     "Hello, {{ endif }} asdasd",
+			shouldError: true,
 		},
 		{
-			name:             "Malformed template starting with 'else' without 'if'",
-			content:          "Hello, {{ else }} asdasd",
-			shouldError:      true,
-			allowPrettyPrint: true,
+			name:        "Malformed template starting with 'else' without 'if'",
+			content:     "Hello, {{ else }} asdasd",
+			shouldError: true,
 		},
 		{
-			name:             "Malformed template 'if' without condition",
-			content:          "Hello, {{ if }} asdasd",
-			shouldError:      true,
-			allowPrettyPrint: true,
+			name:        "Malformed template 'if' without condition",
+			content:     "Hello, {{ if }} asdasd",
+			shouldError: true,
 		},
 		{
-			name:             "Malformed template 'if' block without 'endif'",
-			content:          "Hello, {{ if is_admin }} asdasd",
-			shouldError:      true,
-			allowPrettyPrint: true,
+			name:        "Malformed template 'if' block without 'endif'",
+			content:     "Hello, {{ if is_admin }} asdasd",
+			shouldError: true,
 		},
 		{
 			name:    "If-else statement",
 			content: "Hello, {{ if is_admin }} You are an admin. {{ else }} You are not an admin. {{ endif }}",
 			expected: []Node{
-				{Type: TEXT_NODE, Value: "Hello, "},
-				{
-					Type:  IF_NODE,
-					Value: "is_admin",
-					Children: []Node{
-						{Type: TEXT_NODE, Value: " You are an admin. "},
-						{Type: TEXT_NODE, Value: " You are not an admin. "},
-					},
-				},
+				{Type: TEXT_NODE, Value: ptrStr("Hello, ")},
+				{Type: IF_NODE, Value: ptrStr("is_admin"), Children: []Node{
+					{Type: THEN_BRANCH, Value: nil, Children: []Node{
+						{Type: TEXT_NODE, Value: ptrStr(" You are an admin. ")},
+					}},
+					{Type: ELSE_BRANCH, Value: nil, Children: []Node{
+						{Type: TEXT_NODE, Value: ptrStr(" You are not an admin. ")},
+					}},
+				}},
 			},
 		},
 		{
-			name:    "If-else statement",
+			name:    "Nested if-else statement",
 			content: `Hello, {{ if is_admin }} You are an admin. {{ if is_super_admin}} SuperAdminIsComing {{ if is_super_super_admin}} Yessssss! {{endif}} {{endif}} {{ else }} You are not an admin. {{ endif }}`,
 			expected: []Node{
-				{Type: TEXT_NODE, Value: "Hello, "},
-				{
-					Type:  IF_NODE,
-					Value: "is_admin",
-					Children: []Node{
-						{Type: TEXT_NODE, Value: " You are an admin. "},
-						{
-							Type:  IF_NODE,
-							Value: "is_super_admin",
-							Children: []Node{
-								{Type: TEXT_NODE, Value: " SuperAdminIsComing "},
-								{
-									Type:  IF_NODE,
-									Value: "is_super_super_admin",
-									Children: []Node{
-										{Type: TEXT_NODE, Value: " Yessssss! "},
-									},
-								},
-								{Type: WHITESPACE_NODE, Value: " "},
-							},
-						},
-						{Type: WHITESPACE_NODE, Value: " "},
-						{Type: TEXT_NODE, Value: " You are not an admin. "},
-					},
-				},
+				{Type: TEXT_NODE, Value: ptrStr("Hello, ")},
+				{Type: IF_NODE, Value: ptrStr("is_admin"), Children: []Node{
+					{Type: THEN_BRANCH, Value: nil, Children: []Node{
+						{Type: TEXT_NODE, Value: ptrStr(" You are an admin. ")},
+						{Type: IF_NODE, Value: ptrStr("is_super_admin"), Children: []Node{
+							{Type: THEN_BRANCH, Value: nil, Children: []Node{
+								{Type: TEXT_NODE, Value: ptrStr(" SuperAdminIsComing ")},
+								{Type: IF_NODE, Value: ptrStr("is_super_super_admin"), Children: []Node{
+									{Type: THEN_BRANCH, Value: nil, Children: []Node{
+										{Type: TEXT_NODE, Value: ptrStr(" Yessssss! ")},
+									}},
+								}},
+								{Type: WHITESPACE_NODE, Value: ptrStr(" ")},
+							}},
+						}},
+						{Type: WHITESPACE_NODE, Value: ptrStr(" ")},
+					}},
+					{Type: ELSE_BRANCH, Value: nil, Children: []Node{
+						{Type: TEXT_NODE, Value: ptrStr(" You are not an admin. ")},
+					}},
+				}},
 			},
 		},
 	}
@@ -165,3 +141,5 @@ func TestParser(t *testing.T) {
 		})
 	}
 }
+
+func ptrStr(s string) *string { return &s }
