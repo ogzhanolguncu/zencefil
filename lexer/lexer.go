@@ -36,7 +36,7 @@ const (
 
 // Lets us pretify the enums when printing
 func (tt TokenType) String() string {
-	return [...]string{"TEXT", "OPEN_CURLY", "CLOSE_CURLY", "IDENTIFIER", "KEYWORD"}[tt]
+	return [...]string{"TEXT", "OPEN_CURLY", "CLOSE_CURLY", "IDENTIFIER", "KEYWORD", "WHITESPACE"}[tt]
 }
 
 type Token struct {

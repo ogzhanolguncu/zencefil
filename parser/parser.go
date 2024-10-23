@@ -15,16 +15,12 @@ const (
 	VARIABLE_NODE
 	IF_NODE
 	ELIF_NODE
-	ELSE_NODE
 	FOR_NODE
 	WHITESPACE_NODE
-	FOR_ITERATOR_NODE
-	FOR_ITERABLE_NODE
-	FOR_BODY_NODE
 )
 
 func (tt NodeType) String() string {
-	return [...]string{"TextNode", "VariableNode", "IfNode", "ElifNode", "ForNode", "WhitespaceNode"}[tt]
+	return [...]string{"TEXT_NODE", "VARIABLE_NODE", "IF_NODE", "ELIF_NODE", "FOR_NODE", "WHITESPACE_NODE"}[tt]
 }
 
 type Node struct {
@@ -190,7 +186,7 @@ func (p *Parser) parseBlock() ([]Node, error) {
 					}
 					nodes = append(nodes, ifNode)
 				case "for":
-					//TODO: handle later
+					// TODO: handle later
 				default:
 					panic("Unknown KEYWORD")
 				}
@@ -332,7 +328,7 @@ func prettifyNodes(sb *strings.Builder, nodes []Node, indent int) {
 
 		sb.WriteString(fmt.Sprintf("%s: %s\n",
 			nodeTypeColor(node.Type),
-			nodeValueColor(strings.ReplaceAll(node.Value, "\n", "\\n"))))
+			nodeValueColor(strings.ReplaceAll(strings.ReplaceAll(node.Value, "\n", "\\n"), "\t", "\\t"))))
 
 		if len(node.Children) > 0 {
 			prettifyNodes(sb, node.Children, indent+1)

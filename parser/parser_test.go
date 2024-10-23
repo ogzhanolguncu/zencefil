@@ -33,7 +33,7 @@ func TestParser(t *testing.T) {
 			name: "Simple if-elseif-else statement",
 			content: `Hello, {{ name }}!
 			{{ if is_admin }}
-			 	You are an admin.
+			You are an admin.
 			{{ elif is_super_admin }}
 			  {{ if wohoo }}
 				You are a super admin.
@@ -52,7 +52,7 @@ func TestParser(t *testing.T) {
 				{Type: 1, Value: "name", Children: nil},
 				{Type: 0, Value: "!\n\t\t\t", Children: nil},
 				{Type: 2, Value: "is_admin", Children: []Node{
-					{Type: 0, Value: "\n\t\t\t \tYou are an admin.\n\t\t\t", Children: nil},
+					{Type: 0, Value: "\n\t\t\tYou are an admin.\n\t\t\t", Children: nil},
 					{Type: 3, Value: "is_super_admin", Children: []Node{
 						{Type: 5, Value: "\n\t\t\t  ", Children: nil},
 						{Type: 2, Value: "wohoo", Children: []Node{
