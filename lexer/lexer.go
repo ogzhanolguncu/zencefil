@@ -40,14 +40,14 @@ func (tt TokenType) String() string {
 }
 
 type Token struct {
-	Type  TokenType
 	Value string
+	Type  TokenType
 }
 
 type Lexer struct {
+	rawText string
 	Tokens  []Token
 	crrPos  int
-	rawText string
 	mode    ReadMode
 }
 
@@ -63,6 +63,7 @@ func New(content string) *Lexer {
 // ```
 // Hello, {{ name }}! {{ if is_admin }} You are an admin.{{ end }}
 // ```
+
 func (l *Lexer) Tokenize() []Token {
 	var sb strings.Builder
 	for {
@@ -70,32 +71,31 @@ func (l *Lexer) Tokenize() []Token {
 		if !ok {
 			break // End of input
 		}
-
 		switch l.mode {
 		case TextMode:
 			if char == '{' {
 				peek, _ := l.peek()
 				if peek == '{' {
-					//Append literal
-					l.addToken(sb, TEXT)
+					// Append literal
+					if sb.Len() > 0 && strings.TrimSpace(sb.String()) != "" {
+						l.addToken(sb, TEXT)
+					}
 					sb.Reset()
-
-					//Append openning tag
-					l.advance() // consume the second '}'
+					// Append opening tag
+					l.advance() // consume the second '{'
 					var sbAlt strings.Builder
 					sbAlt.WriteString("{{")
 					l.addToken(sbAlt, OPEN_CURLY)
-
-					//Switch to tag mode
+					// Switch to tag mode
 					l.switchMode()
 				}
 			} else {
 				sb.WriteRune(char)
 			}
 		case TagMode:
-			// Handles the case where there is a space between keyword and identifiers
 			if unicode.IsSpace(char) {
 				if sb.Len() > 0 {
+					// Only emit token if we have accumulated content
 					if isKeyword(sb.String()) {
 						l.addToken(sb, KEYWORD)
 					} else {
@@ -103,7 +103,7 @@ func (l *Lexer) Tokenize() []Token {
 					}
 					sb.Reset()
 				}
-				// Handles keyword or identifier before closing the tag
+				// Ignore the whitespace in tag mode
 			} else if char == '}' {
 				peek, _ := l.peek()
 				if peek == '}' {
@@ -115,22 +115,19 @@ func (l *Lexer) Tokenize() []Token {
 						}
 						sb.Reset()
 					}
-					//Append closing tag
+					// Append closing tag
 					l.advance() // consume the second '}'
 					var sbAlt strings.Builder
 					sbAlt.WriteString("}}")
 					l.addToken(sbAlt, CLOSE_CURLY)
-
-					//Switch to text mode
+					// Switch to text mode
 					l.switchMode()
 				} else {
 					sb.WriteRune(char)
 				}
-
 			} else {
 				sb.WriteRune(char)
 			}
-
 		}
 	}
 
@@ -148,7 +145,6 @@ func (l *Lexer) Tokenize() []Token {
 			}
 		}
 	}
-
 	return l.Tokens
 }
 

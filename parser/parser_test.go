@@ -27,7 +27,6 @@ func TestParser(t *testing.T) {
 						{Type: TEXT_NODE, Value: ptrStr(" You are an admin.")},
 					}},
 				}},
-				{Type: WHITESPACE_NODE, Value: ptrStr(" ")},
 				{Type: VARIABLE_NODE, Value: ptrStr("surname")},
 			},
 		},
@@ -54,7 +53,6 @@ func TestParser(t *testing.T) {
 				}},
 				{Type: TEXT_NODE, Value: ptrStr("!")},
 			},
-			allowPrettyPrint: true,
 		},
 		{
 			name:        "Malformed template starting with 'endif' without 'if'",
@@ -107,16 +105,29 @@ func TestParser(t *testing.T) {
 										{Type: TEXT_NODE, Value: ptrStr(" Yessssss! ")},
 									}},
 								}},
-								{Type: WHITESPACE_NODE, Value: ptrStr(" ")},
 							}},
 						}},
-						{Type: WHITESPACE_NODE, Value: ptrStr(" ")},
 					}},
 					{Type: ELSE_BRANCH, Value: nil, Children: []Node{
 						{Type: TEXT_NODE, Value: ptrStr(" You are not an admin. ")},
 					}},
 				}},
 			},
+		},
+		{
+			name:    "Simple for statement",
+			content: "{{for item in items}} ahmet has this item:{{item}} {{endfor}}",
+			expected: []Node{
+				{Type: FOR_NODE, Children: []Node{
+					{Type: ITERATEE_ITEM, Value: ptrStr("item")},
+					{Type: ITERATOR_ITEM, Value: ptrStr("items")},
+					{Type: FOR_BODY, Value: nil, Children: []Node{
+						{Type: TEXT_NODE, Value: ptrStr(" ahmet has this item:")},
+						{Type: VARIABLE_NODE, Value: ptrStr("item")},
+					}},
+				}},
+			},
+			allowPrettyPrint: true,
 		},
 	}
 

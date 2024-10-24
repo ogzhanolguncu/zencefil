@@ -21,17 +21,34 @@ const (
 	ELSE_BRANCH
 
 	FOR_NODE
+	ITERATOR_ITEM
+	ITERATEE_ITEM
+	FOR_BODY
+
 	WHITESPACE_NODE
 )
 
 func (tt NodeType) String() string {
-	return [...]string{"TEXT_NODE", "VARIABLE_NODE", "IF_NODE", "THEN_BRANCH", "ELIF_BRANCH", "ELIF_ITEM", "ELSE_BRANCH", "FOR_NODE", "WHITESPACE_NODE"}[tt]
+	return [...]string{
+		"TEXT_NODE",
+		"VARIABLE_NODE",
+		"IF_NODE",
+		"THEN_BRANCH",
+		"ELIF_BRANCH",
+		"ELIF_ITEM",
+		"ELSE_BRANCH",
+		"FOR_NODE",
+		"ITERATOR_ITEM",
+		"ITERATEE_ITEM",
+		"FOR_BODY",
+		"WHITESPACE_NODE",
+	}[tt]
 }
 
 type Node struct {
-	Type     NodeType
 	Value    *string
 	Children []Node
+	Type     NodeType
 }
 
 func NewNode(nodeType NodeType, value *string, children ...Node) Node {
@@ -65,6 +82,13 @@ func NewIfNode(condition *string, thenBranch, elifBranch, elseBranch Node) Node 
 	}
 }
 
+func NewForNode(iterator, iteratee, body Node) Node {
+	return Node{
+		Type:     FOR_NODE,
+		Children: []Node{iteratee, iterator, body},
+	}
+}
+
 type Parser struct {
 	tokens []lexer.Token
 	crrPos int
@@ -83,9 +107,11 @@ func (p *Parser) Parse() ([]Node, error) {
 		if p.isAtEnd() {
 			return nodes, nil
 		}
+
 		if p.isBlockEnd() {
 			return nil, fmt.Errorf("malformed tokens. 'else' or 'endif' cannot be used without 'if'")
 		}
+
 		if p.match(lexer.TEXT) {
 			prevVal := p.previous().Value
 			nodes = append(nodes, NewNode(TEXT_NODE, &prevVal))
@@ -94,12 +120,24 @@ func (p *Parser) Parse() ([]Node, error) {
 			prevVal := p.previous().Value
 			nodes = append(nodes, NewNode(WHITESPACE_NODE, &prevVal))
 		} else if p.match(lexer.OPEN_CURLY) {
-			if p.match(lexer.KEYWORD) && p.previous().Value == "if" {
-				IfNode, err := p.parseIf()
-				if err != nil {
-					return nil, fmt.Errorf("error parsing if statement: %w", err)
+			if p.match(lexer.KEYWORD) {
+				prevVal := p.previous().Value
+				switch prevVal {
+				case "if":
+					IfNode, err := p.parseIf()
+					if err != nil {
+						return nil, fmt.Errorf("error parsing if statement: %w", err)
+					}
+					nodes = append(nodes, IfNode)
+				case "for":
+					forNode, err := p.parseFor()
+					if err != nil {
+						return nil, fmt.Errorf("error parsing for statement: %w", err)
+					}
+					nodes = append(nodes, forNode)
+				default:
+					panic("Unknown KEYWORD")
 				}
-				nodes = append(nodes, IfNode)
 			} else if p.match(lexer.IDENTIFIER) {
 				prevVal := p.previous().Value
 				nodes = append(nodes, NewNode(VARIABLE_NODE, &prevVal))
@@ -165,6 +203,40 @@ func (p *Parser) parseIf() (Node, error) {
 		elseBlock), nil
 }
 
+func (p *Parser) parseFor() (Node, error) {
+	iteratee, err := p.expectForIteratee()
+	iterateeNode := Node{Type: ITERATEE_ITEM, Value: &iteratee}
+	if err != nil {
+		return Node{}, err
+	}
+
+	if err := p.expectInKeyword(); err != nil {
+		return Node{}, err
+	}
+
+	iterator, err := p.expectForIterator()
+	iteratorNode := Node{Type: ITERATOR_ITEM, Value: &iterator}
+	if err != nil {
+		return Node{}, err
+	}
+
+	if err := p.expectCloseCurly(); err != nil {
+		return Node{}, err
+	}
+
+	body, err := p.parseBlock()
+	forBody := Node{Type: FOR_BODY, Children: body}
+	if err != nil {
+		return Node{}, fmt.Errorf("error parsing for body: %w", err)
+	}
+
+	if err := p.expectAndConsumeEndFor(); err != nil {
+		return Node{}, err
+	}
+
+	return NewForNode(iteratorNode, iterateeNode, forBody), nil
+}
+
 func (p *Parser) parseElse() (Node, error) {
 	p.advance()
 	p.advance()
@@ -204,7 +276,6 @@ func (p *Parser) parseBlock() ([]Node, error) {
 
 	for !p.isAtEnd() && !p.isBlockEnd() {
 		if p.match(lexer.TEXT) {
-
 			prevVal := p.previous().Value
 			nodes = append(nodes, NewNode(TEXT_NODE, &prevVal))
 		} else if p.match(lexer.WHITESPACE) {
@@ -220,7 +291,11 @@ func (p *Parser) parseBlock() ([]Node, error) {
 					}
 					nodes = append(nodes, ifNode)
 				case "for":
-					// TODO: handle later
+					forNode, err := p.parseFor()
+					if err != nil {
+						return nil, fmt.Errorf("error parsing nested for statement: %w", err)
+					}
+					nodes = append(nodes, forNode)
 				default:
 					panic("Unknown KEYWORD")
 				}
@@ -229,7 +304,6 @@ func (p *Parser) parseBlock() ([]Node, error) {
 				nodes = append(nodes, NewNode(VARIABLE_NODE, &prevVal))
 				p.advance() // consume '}}' of variable node
 			} else {
-				// TODO: Later this will also handle 'for'  token
 				return nil, fmt.Errorf("unexpected token after '{{': %v", p.peek())
 			}
 		} else {
@@ -240,7 +314,7 @@ func (p *Parser) parseBlock() ([]Node, error) {
 }
 
 func (p *Parser) isBlockEnd() bool {
-	return p.isElseKeyword() || p.isElifKeyword() || p.isEndIfKeyword()
+	return p.isElseKeyword() || p.isElifKeyword() || p.isEndIfKeyword() || p.isEndForKeyword()
 }
 
 func (p *Parser) isElifKeyword() bool {
@@ -255,9 +329,27 @@ func (p *Parser) isEndIfKeyword() bool {
 	return p.check(lexer.OPEN_CURLY) && p.checkNext(lexer.KEYWORD) && p.tokens[p.crrPos+1].Value == "endif"
 }
 
+func (p *Parser) isEndForKeyword() bool {
+	return p.check(lexer.OPEN_CURLY) && p.checkNext(lexer.KEYWORD) && p.tokens[p.crrPos+1].Value == "endfor"
+}
+
 func (p *Parser) expectIfIdentifier() (string, error) {
 	if !p.match(lexer.IDENTIFIER) {
 		return "", fmt.Errorf("expected condition after 'if', got %v", p.peek())
+	}
+	return p.previous().Value, nil
+}
+
+func (p *Parser) expectForIteratee() (string, error) {
+	if !p.match(lexer.IDENTIFIER) {
+		return "", fmt.Errorf("expected iteratee after 'for', got %v", p.peek())
+	}
+	return p.previous().Value, nil
+}
+
+func (p *Parser) expectForIterator() (string, error) {
+	if !p.match(lexer.IDENTIFIER) {
+		return "", fmt.Errorf("expected iterator after 'in', got %v", p.peek())
 	}
 	return p.previous().Value, nil
 }
@@ -271,9 +363,25 @@ func (p *Parser) expectAndConsumeEndIf() error {
 	return p.expectCloseCurly()
 }
 
+func (p *Parser) expectAndConsumeEndFor() error {
+	if !p.isEndForKeyword() {
+		return fmt.Errorf("expected '{{ endfor }}' to close for statement, got: %v", p.peek())
+	}
+	p.advance() // {{
+	p.advance() // endif
+	return p.expectCloseCurly()
+}
+
 func (p *Parser) expectCloseCurly() error {
 	if !p.match(lexer.CLOSE_CURLY) {
 		return fmt.Errorf("expected '}}', got %v", p.peek())
+	}
+	return nil
+}
+
+func (p *Parser) expectInKeyword() error {
+	if p.match(lexer.KEYWORD) && p.previous().Value != "in" {
+		return fmt.Errorf("expected 'in', got %v", p.peek())
 	}
 	return nil
 }
@@ -349,6 +457,7 @@ func prettifyNodes(sb *strings.Builder, nodes []Node, indent int) {
 			nodeValueColor = color.New(color.FgGreen).SprintFunc()
 		case VARIABLE_NODE:
 			nodeValueColor = color.New(color.FgYellow).SprintFunc()
+
 		case IF_NODE:
 			nodeValueColor = color.New(color.FgMagenta).SprintFunc()
 		case THEN_BRANCH:
@@ -356,11 +465,19 @@ func prettifyNodes(sb *strings.Builder, nodes []Node, indent int) {
 		case ELIF_BRANCH:
 			nodeValueColor = color.New(color.FgMagenta).SprintFunc()
 		case ELIF_ITEM:
-			nodeValueColor = color.New(color.FgHiCyan).SprintFunc()
+			nodeValueColor = color.New(color.FgMagenta).SprintFunc()
 		case ELSE_BRANCH:
 			nodeValueColor = color.New(color.FgMagenta).SprintFunc()
+
 		case FOR_NODE:
 			nodeValueColor = color.New(color.FgBlue).SprintFunc()
+		case ITERATEE_ITEM:
+			nodeValueColor = color.New(color.FgBlue).SprintFunc()
+		case ITERATOR_ITEM:
+			nodeValueColor = color.New(color.FgBlue).SprintFunc()
+		case FOR_BODY:
+			nodeValueColor = color.New(color.FgBlue).SprintFunc()
+
 		case WHITESPACE_NODE:
 			nodeValueColor = color.New(color.FgWhite).SprintFunc()
 		default:

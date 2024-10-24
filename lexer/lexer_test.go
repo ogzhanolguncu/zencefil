@@ -28,6 +28,43 @@ func TestLexer(t *testing.T) {
 
 	require.Equal(t, expected, tokens)
 }
+
+func TestLexerWithoutText(t *testing.T) {
+	content := "{{ name }}"
+	tokens := New(content).Tokenize()
+
+	expected := []Token{
+		{Type: OPEN_CURLY, Value: "{{"},
+		{Type: IDENTIFIER, Value: "name"},
+		{Type: CLOSE_CURLY, Value: "}}"},
+	}
+
+	require.Equal(t, expected, tokens)
+}
+
+func TestBasicLexer(t *testing.T) {
+	content := "Hello, {{ name }}! {{ if is_admin }} You are an admin.{{ endif }}"
+	tokens := New(content).Tokenize()
+
+	expected := []Token{
+		{Type: TEXT, Value: "Hello, "},
+		{Type: OPEN_CURLY, Value: "{{"},
+		{Type: IDENTIFIER, Value: "name"},
+		{Type: CLOSE_CURLY, Value: "}}"},
+		{Type: TEXT, Value: "! "},
+		{Type: OPEN_CURLY, Value: "{{"},
+		{Type: KEYWORD, Value: "if"},
+		{Type: IDENTIFIER, Value: "is_admin"},
+		{Type: CLOSE_CURLY, Value: "}}"},
+		{Type: TEXT, Value: " You are an admin."},
+		{Type: OPEN_CURLY, Value: "{{"},
+		{Type: KEYWORD, Value: "endif"},
+		{Type: CLOSE_CURLY, Value: "}}"},
+	}
+
+	require.Equal(t, expected, tokens)
+}
+
 func TestMoreComplexLexer(t *testing.T) {
 	content := `
 	<html>
