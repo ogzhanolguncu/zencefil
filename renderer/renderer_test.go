@@ -142,7 +142,7 @@ func TestRenderer(t *testing.T) {
 				"isAdmin":       true,
 				"hasFullAccess": true,
 			},
-			expected: "\n\t\t\t\tWelcome!\n\t\t\t\t\n\t\t\t\t\tAdmin Panel\n\t\t\t\t\tFull Access",
+			expected: "\n\t\t\t\tWelcome!\n\t\t\t\t\n\t\t\t\t\tAdmin Panel\n\t\t\t\t\tFull Access\n\t\t\t\t\n\t\t\t",
 		},
 
 		// Error cases
@@ -202,6 +202,16 @@ func TestRenderer(t *testing.T) {
 				"isAdmin": true,
 			},
 			expected: "Line 1\n\t\t\t\n\t\t\t\tAdmin\n\t\t\t\n\t\t\tLine 2",
+		},
+		// Loops
+		{
+			name:    "Basic loop test",
+			content: "ahmet has this items:{{for item in items}}\n{{item}}{{endfor}}",
+			context: map[string]interface{}{
+				"items": []interface{}{"pen", "pencil", "book"},
+			},
+			expected:       "ahmet has this items:\npen\npencil\nbook",
+			prettyPrintAST: true,
 		},
 	}
 

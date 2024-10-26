@@ -7,13 +7,11 @@ import (
 	"github.com/ogzhanolguncu/zencefil/parser"
 )
 
-// Renderer handles template rendering using an AST and context
 type Renderer struct {
 	Context map[string]interface{}
 	AST     []parser.Node
 }
 
-// New creates a new Renderer instance
 func New(ast []parser.Node, context map[string]interface{}) *Renderer {
 	if context == nil {
 		context = make(map[string]interface{})
@@ -24,7 +22,6 @@ func New(ast []parser.Node, context map[string]interface{}) *Renderer {
 	}
 }
 
-// RenderError represents a template rendering error
 type RenderError struct {
 	Message string
 	Node    parser.Node
@@ -34,12 +31,10 @@ func (e *RenderError) Error() string {
 	return fmt.Sprintf("render error: %s", e.Message)
 }
 
-// Render processes the AST and returns the rendered template
 func (r *Renderer) Render() (string, error) {
 	return r.renderNodes(r.AST)
 }
 
-// renderNodes handles rendering a slice of nodes
 func (r *Renderer) renderNodes(nodes []parser.Node) (string, error) {
 	var sb strings.Builder
 	for _, node := range nodes {
@@ -52,10 +47,9 @@ func (r *Renderer) renderNodes(nodes []parser.Node) (string, error) {
 	return sb.String(), nil
 }
 
-// renderNode handles rendering a single node
 func (r *Renderer) renderNode(node parser.Node) (string, error) {
 	switch node.Type {
-	case parser.TEXT_NODE:
+	case parser.TEXT_NODE, parser.WHITESPACE_NODE:
 		if node.Value == nil {
 			return "", &RenderError{Message: "text node has nil value", Node: node}
 		}
@@ -77,12 +71,77 @@ func (r *Renderer) renderNode(node parser.Node) (string, error) {
 	case parser.IF_NODE:
 		return r.renderIfNode(node)
 
+	case parser.FOR_NODE:
+		return r.renderForNode(node)
+
 	default:
 		return "", &RenderError{
 			Message: fmt.Sprintf("unknown node type: %v", node.Type),
 			Node:    node,
 		}
 	}
+}
+
+func (r *Renderer) renderForNode(node parser.Node) (string, error) {
+	var iteratee string
+	var iterator []interface{}
+	var sb strings.Builder
+
+	for _, forNode := range node.Children {
+		switch forNode.Type {
+		case parser.ITERATEE_ITEM:
+			if forNode.Value == nil {
+				return "", &RenderError{Message: "iteratee item has nil value", Node: forNode}
+			}
+			iteratee = *forNode.Value
+
+		case parser.ITERATOR_ITEM:
+			if forNode.Value == nil {
+				return "", &RenderError{Message: "iterator item has nil value", Node: forNode}
+			}
+			variable, found := r.variableLookup(*forNode.Value)
+			if !found {
+				return "", &RenderError{
+					Message: fmt.Sprintf("iterator variable '%s' not found in context", *forNode.Value),
+				}
+			}
+			var ok bool
+			iterator, ok = variable.([]interface{})
+			if !ok {
+				return "", &RenderError{
+					Message: fmt.Sprintf("iterator must be a slice, got %T", variable),
+				}
+			}
+		}
+	}
+
+	for _, forNode := range node.Children {
+		if forNode.Type == parser.FOR_BODY {
+			// Store original value to restore after loop
+			originalValue, hadOriginal := r.Context[iteratee]
+
+			for _, item := range iterator {
+				r.Context[iteratee] = item
+				rendered, err := r.renderNodes(forNode.Children)
+				if err != nil {
+					return "", &RenderError{
+						Message: fmt.Sprintf("error in for loop: %v", err),
+						Node:    node,
+					}
+				}
+				sb.WriteString(rendered)
+			}
+
+			// Restore original context
+			if hadOriginal {
+				r.Context[iteratee] = originalValue
+			} else {
+				delete(r.Context, iteratee)
+			}
+		}
+	}
+
+	return sb.String(), nil
 }
 
 // renderIfNode handles rendering if/elif/else conditional blocks
