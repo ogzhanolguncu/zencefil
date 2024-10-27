@@ -115,10 +115,6 @@ func (p *Parser) Parse() ([]Node, error) {
 		if p.match(lexer.TEXT) {
 			prevVal := p.previous().Value
 			nodes = append(nodes, NewNode(TEXT_NODE, &prevVal))
-		} else if p.match(lexer.WHITESPACE) {
-			// TODO: If there are more than one space I should count them as one.
-			prevVal := p.previous().Value
-			nodes = append(nodes, NewNode(WHITESPACE_NODE, &prevVal))
 		} else if p.match(lexer.OPEN_CURLY) {
 			if p.match(lexer.KEYWORD) {
 				prevVal := p.previous().Value
@@ -278,9 +274,6 @@ func (p *Parser) parseBlock() ([]Node, error) {
 		if p.match(lexer.TEXT) {
 			prevVal := p.previous().Value
 			nodes = append(nodes, NewNode(TEXT_NODE, &prevVal))
-		} else if p.match(lexer.WHITESPACE) {
-			prevVal := p.previous().Value
-			nodes = append(nodes, NewNode(WHITESPACE_NODE, &prevVal))
 		} else if p.match(lexer.OPEN_CURLY) {
 			if p.match(lexer.KEYWORD) {
 				switch p.previous().Value {

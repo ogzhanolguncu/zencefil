@@ -27,6 +27,7 @@ func TestParser(t *testing.T) {
 						{Type: TEXT_NODE, Value: ptrStr(" You are an admin.")},
 					}},
 				}},
+				{Type: TEXT_NODE, Value: ptrStr(" ")}, // Changed from WHITESPACE_NODE to TEXT_NODE
 				{Type: VARIABLE_NODE, Value: ptrStr("surname")},
 			},
 		},
@@ -105,8 +106,10 @@ func TestParser(t *testing.T) {
 										{Type: TEXT_NODE, Value: ptrStr(" Yessssss! ")},
 									}},
 								}},
+								{Type: TEXT_NODE, Value: ptrStr(" ")}, // Changed from WHITESPACE_NODE to TEXT_NODE
 							}},
 						}},
+						{Type: TEXT_NODE, Value: ptrStr(" ")}, // Changed from WHITESPACE_NODE to TEXT_NODE
 					}},
 					{Type: ELSE_BRANCH, Value: nil, Children: []Node{
 						{Type: TEXT_NODE, Value: ptrStr(" You are not an admin. ")},
@@ -121,13 +124,13 @@ func TestParser(t *testing.T) {
 				{Type: FOR_NODE, Children: []Node{
 					{Type: ITERATEE_ITEM, Value: ptrStr("item")},
 					{Type: ITERATOR_ITEM, Value: ptrStr("items")},
-					{Type: FOR_BODY, Value: nil, Children: []Node{
+					{Type: FOR_BODY, Children: []Node{ // Removed Value: nil since it's not needed
 						{Type: TEXT_NODE, Value: ptrStr(" ahmet has this item:")},
 						{Type: VARIABLE_NODE, Value: ptrStr("item")},
+						{Type: TEXT_NODE, Value: ptrStr(" ")}, // Changed from WHITESPACE_NODE to TEXT_NODE
 					}},
 				}},
 			},
-			allowPrettyPrint: true,
 		},
 	}
 
@@ -136,9 +139,7 @@ func TestParser(t *testing.T) {
 			ast, err := New(lexer.New(tt.content).Tokenize()).Parse()
 
 			if tt.shouldError {
-				if err == nil {
-					t.Errorf("Expected an error, but got none")
-				}
+				require.Error(t, err)
 				return
 			}
 
