@@ -1,7 +1,7 @@
 package lexer
 
 import (
-	"log"
+	"strconv"
 	"strings"
 	"unicode"
 )
@@ -14,6 +14,20 @@ var keywords = map[string]bool{
 	"in":     true,
 	"endif":  true,
 	"endfor": true,
+}
+
+var operators = map[string]TokenType{
+	"&&": AMPERSAND,
+	"||": PIPE,
+	">=": GTE,
+	">":  GT,
+	"<":  LT,
+	"<=": LTE,
+	"==": EQ,
+	"!=": NEQ,
+	"!":  BANG,
+	"(":  LPAREN,
+	")":  RPAREN,
 }
 
 type ReadMode int
@@ -31,10 +45,42 @@ const (
 	CLOSE_CURLY
 	IDENTIFIER
 	KEYWORD
+	PIPE
+	AMPERSAND
+	NUMBER
+	STRING
+	LTE
+	GTE
+	EQ
+	NEQ
+	GT
+	LT
+	RPAREN
+	LPAREN
+	BANG
 )
 
 func (tt TokenType) String() string {
-	return [...]string{"TEXT", "OPEN_CURLY", "CLOSE_CURLY", "IDENTIFIER", "KEYWORD", "WHITESPACE"}[tt]
+	return [...]string{
+		"OPEN_CURLY",
+		"TEXT",
+		"CLOSE_CURLY",
+		"IDENTIFIER",
+		"KEYWORD",
+		"PIPE",
+		"AMPERSAND",
+		"NUMBER",
+		"STRING",
+		"LTE",
+		"GTE",
+		"EQ",
+		"NEQ",
+		"GT",
+		"LT",
+		"RPAREN",
+		"LPAREN",
+		"BANG",
+	}[tt]
 }
 
 type Token struct {
@@ -70,14 +116,11 @@ func (l *Lexer) Tokenize() []Token {
 		case TextMode:
 			peek, _ := l.peek()
 			if char == '{' && peek == '{' {
-				// Handle accumulated text before the tag
 				if sb.Len() > 0 {
 					text := sb.String()
 					l.Tokens = append(l.Tokens, Token{Value: text, Type: TEXT})
+					sb.Reset()
 				}
-				sb.Reset()
-
-				// Handle opening tag
 				l.advance() // consume the second '{'
 				l.Tokens = append(l.Tokens, Token{Value: "{{", Type: OPEN_CURLY})
 				l.mode = TagMode
@@ -88,56 +131,84 @@ func (l *Lexer) Tokenize() []Token {
 		case TagMode:
 			if unicode.IsSpace(char) {
 				if sb.Len() > 0 {
-					text := sb.String()
-					if isKeyword(text) {
-						l.Tokens = append(l.Tokens, Token{Value: text, Type: KEYWORD})
-					} else {
-						l.Tokens = append(l.Tokens, Token{Value: text, Type: IDENTIFIER})
-					}
+					l.addToken(sb.String())
 					sb.Reset()
 				}
-				// Skip whitespace in tag mode
-			} else if char == '}' {
+				continue
+			}
+
+			if char == '}' {
 				peek, _ := l.peek()
 				if peek == '}' {
 					if sb.Len() > 0 {
-						text := sb.String()
-						if isKeyword(text) {
-							l.Tokens = append(l.Tokens, Token{Value: text, Type: KEYWORD})
-						} else {
-							l.Tokens = append(l.Tokens, Token{Value: text, Type: IDENTIFIER})
-						}
+						l.addToken(sb.String())
 						sb.Reset()
 					}
-
 					l.advance() // consume the second '}'
 					l.Tokens = append(l.Tokens, Token{Value: "}}", Type: CLOSE_CURLY})
 					l.mode = TextMode
-				} else {
-					sb.WriteRune(char)
+					continue
 				}
-			} else {
-				sb.WriteRune(char)
 			}
+
+			// Check for two-character operators
+			currentChar := string(char)
+			peek, hasPeek := l.peek()
+			if hasPeek {
+				potentialOp := currentChar + string(peek)
+				if tokenType, exists := operators[potentialOp]; exists {
+					if sb.Len() > 0 {
+						l.addToken(sb.String())
+						sb.Reset()
+					}
+					l.advance() // consume the second character
+					l.Tokens = append(l.Tokens, Token{Value: potentialOp, Type: tokenType})
+					continue
+				}
+			}
+
+			// Check for single-character operators, e.g '!', '>','<'
+			if tokenType, exists := operators[currentChar]; exists {
+				if sb.Len() > 0 {
+					l.addToken(sb.String())
+					sb.Reset()
+				}
+				l.Tokens = append(l.Tokens, Token{Value: currentChar, Type: tokenType})
+				continue
+			}
+
+			sb.WriteRune(char)
 		}
 	}
 
 	// Handle any remaining text
 	if sb.Len() > 0 {
-		text := sb.String()
 		if l.mode == TextMode {
-			l.Tokens = append(l.Tokens, Token{Value: text, Type: TEXT})
+			l.Tokens = append(l.Tokens, Token{Value: sb.String(), Type: TEXT})
 		} else {
-			log.Printf("Warning: Unclosed tag at end of input")
-			if isKeyword(text) {
-				l.Tokens = append(l.Tokens, Token{Value: text, Type: KEYWORD})
-			} else {
-				l.Tokens = append(l.Tokens, Token{Value: text, Type: IDENTIFIER})
-			}
+			l.addToken(sb.String())
 		}
 	}
 
 	return l.Tokens
+}
+
+func (l *Lexer) addToken(text string) {
+	if text == "" {
+		return
+	}
+
+	switch {
+	case keywords[text]:
+		l.Tokens = append(l.Tokens, Token{Value: text, Type: KEYWORD})
+	case isNumber(text):
+		l.Tokens = append(l.Tokens, Token{Value: text, Type: NUMBER})
+	case isString(text):
+		str := strings.Trim(text, "'")
+		l.Tokens = append(l.Tokens, Token{Value: str, Type: STRING})
+	default:
+		l.Tokens = append(l.Tokens, Token{Value: text, Type: IDENTIFIER})
+	}
 }
 
 func (l *Lexer) advance() (rune, bool) {
@@ -156,6 +227,11 @@ func (l *Lexer) peek() (rune, bool) {
 	return rune(l.rawText[l.crrPos]), true
 }
 
-func isKeyword(word string) bool {
-	return keywords[word]
+func isNumber(text string) bool {
+	_, err := strconv.ParseFloat(text, 64)
+	return err == nil
+}
+
+func isString(text string) bool {
+	return strings.HasPrefix(text, "'") && strings.HasSuffix(text, "'")
 }

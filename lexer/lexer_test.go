@@ -99,3 +99,117 @@ func TestComplexTemplate(t *testing.T) {
 	}
 	require.Equal(t, expected, tokens)
 }
+
+func TestLexerOperators(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected []Token
+	}{
+		{
+			name:  "logical AND operator",
+			input: "{{isAdmin&&isActive}}",
+			expected: []Token{
+				{Type: OPEN_CURLY, Value: "{{"},
+				{Type: IDENTIFIER, Value: "isAdmin"},
+				{Type: AMPERSAND, Value: "&&"},
+				{Type: IDENTIFIER, Value: "isActive"},
+				{Type: CLOSE_CURLY, Value: "}}"},
+			},
+		},
+		{
+			name:  "logical OR operator",
+			input: "{{ isPremium || hasTrial }}",
+			expected: []Token{
+				{Type: OPEN_CURLY, Value: "{{"},
+				{Type: IDENTIFIER, Value: "isPremium"},
+				{Type: PIPE, Value: "||"},
+				{Type: IDENTIFIER, Value: "hasTrial"},
+				{Type: CLOSE_CURLY, Value: "}}"},
+			},
+		},
+		{
+			name:  "NOT operator",
+			input: "{{ !isBanned }}",
+			expected: []Token{
+				{Type: OPEN_CURLY, Value: "{{"},
+				{Type: BANG, Value: "!"},
+				{Type: IDENTIFIER, Value: "isBanned"},
+				{Type: CLOSE_CURLY, Value: "}}"},
+			},
+		},
+		{
+			name:  "comparison operators",
+			input: "{{ age >= 18 && score <= 100 }}",
+			expected: []Token{
+				{Type: OPEN_CURLY, Value: "{{"},
+				{Type: IDENTIFIER, Value: "age"},
+				{Type: GTE, Value: ">="},
+				{Type: NUMBER, Value: "18"},
+				{Type: AMPERSAND, Value: "&&"},
+				{Type: IDENTIFIER, Value: "score"},
+				{Type: LTE, Value: "<="},
+				{Type: NUMBER, Value: "100"},
+				{Type: CLOSE_CURLY, Value: "}}"},
+			},
+		},
+		{
+			name:  "equality operators",
+			input: "{{ name == 'John' && role != 'guest' }}",
+			expected: []Token{
+				{Type: OPEN_CURLY, Value: "{{"},
+				{Type: IDENTIFIER, Value: "name"},
+				{Type: EQ, Value: "=="},
+				{Type: STRING, Value: "John"},
+				{Type: AMPERSAND, Value: "&&"},
+				{Type: IDENTIFIER, Value: "role"},
+				{Type: NEQ, Value: "!="},
+				{Type: STRING, Value: "guest"},
+				{Type: CLOSE_CURLY, Value: "}}"},
+			},
+		},
+		{
+			name:  "complex condition",
+			input: "{{(age>18&&hasLicense)||hasSpecialPermit}}",
+			expected: []Token{
+				{Type: OPEN_CURLY, Value: "{{"},
+				{Type: LPAREN, Value: "("},
+				{Type: IDENTIFIER, Value: "age"},
+				{Type: GT, Value: ">"},
+				{Type: NUMBER, Value: "18"},
+				{Type: AMPERSAND, Value: "&&"},
+				{Type: IDENTIFIER, Value: "hasLicense"},
+				{Type: RPAREN, Value: ")"},
+				{Type: PIPE, Value: "||"},
+				{Type: IDENTIFIER, Value: "hasSpecialPermit"},
+				{Type: CLOSE_CURLY, Value: "}}"},
+			},
+		},
+		{
+			name:  "mixed operators",
+			input: "{{ !isBlocked && (age >= 18 || hasParentalConsent) }}",
+			expected: []Token{
+				{Type: OPEN_CURLY, Value: "{{"},
+				{Type: BANG, Value: "!"},
+				{Type: IDENTIFIER, Value: "isBlocked"},
+				{Type: AMPERSAND, Value: "&&"},
+				{Type: LPAREN, Value: "("},
+				{Type: IDENTIFIER, Value: "age"},
+				{Type: GTE, Value: ">="},
+				{Type: NUMBER, Value: "18"},
+				{Type: PIPE, Value: "||"},
+				{Type: IDENTIFIER, Value: "hasParentalConsent"},
+				{Type: RPAREN, Value: ")"},
+				{Type: CLOSE_CURLY, Value: "}}"},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			lexer := New(tt.input)
+			tokens := lexer.Tokenize()
+			require.Equal(t, tt.expected, tokens)
+		})
+	}
+}
