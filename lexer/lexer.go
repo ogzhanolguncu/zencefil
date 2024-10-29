@@ -16,7 +16,7 @@ var keywords = map[string]bool{
 	"endfor": true,
 }
 
-var operators = map[string]TokenType{
+var Operators = map[string]TokenType{
 	"&&": AMPERSAND,
 	"||": PIPE,
 	">=": GTE,
@@ -68,8 +68,8 @@ const (
 
 func (tt TokenType) String() string {
 	return [...]string{
-		"OPEN_CURLY",
 		"TEXT",
+		"OPEN_CURLY",
 		"CLOSE_CURLY",
 		"IDENTIFIER",
 		"KEYWORD",
@@ -88,6 +88,7 @@ func (tt TokenType) String() string {
 		"OPEN_BRACKET",
 		"CLOSE_BRACKET",
 		"BANG",
+		"NULL_COALESCE",
 	}[tt]
 }
 
@@ -164,7 +165,7 @@ func (l *Lexer) Tokenize() []Token {
 			peek, hasPeek := l.peek()
 			if hasPeek {
 				potentialOp := currentChar + string(peek)
-				if tokenType, exists := operators[potentialOp]; exists {
+				if tokenType, exists := Operators[potentialOp]; exists {
 					if sb.Len() > 0 {
 						l.addToken(sb.String())
 						sb.Reset()
@@ -176,7 +177,7 @@ func (l *Lexer) Tokenize() []Token {
 			}
 
 			// Check for single-character operators, e.g '!', '>','<'
-			if tokenType, exists := operators[currentChar]; exists {
+			if tokenType, exists := Operators[currentChar]; exists {
 				if sb.Len() > 0 {
 					l.addToken(sb.String())
 					sb.Reset()

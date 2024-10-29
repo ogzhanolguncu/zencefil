@@ -49,7 +49,7 @@ func (r *Renderer) renderNodes(nodes []parser.Node) (string, error) {
 
 func (r *Renderer) renderNode(node parser.Node) (string, error) {
 	switch node.Type {
-	case parser.TEXT_NODE, parser.WHITESPACE_NODE:
+	case parser.TEXT_NODE:
 		if node.Value == nil {
 			return "", &RenderError{Message: "text node has nil value", Node: node}
 		}

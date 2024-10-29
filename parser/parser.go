@@ -2,6 +2,7 @@ package parser
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/ogzhanolguncu/zencefil/lexer"
 )
@@ -11,25 +12,43 @@ type NodeType int
 const (
 	TEXT_NODE NodeType = iota
 	VARIABLE_NODE
-
+	EXPRESSION_NODE
+	OP_EQUALS
+	OP_NOT_EQUALS
+	OP_AND
+	OP_OR
+	OP_LT
+	OP_GT
+	OP_LTE
+	OP_GTE
+	STRING_LITERAL_NODE
+	NUMBER_LITERAL_NODE
 	IF_NODE
 	THEN_BRANCH
 	ELIF_BRANCH
 	ELIF_ITEM
 	ELSE_BRANCH
-
 	FOR_NODE
 	ITERATOR_ITEM
 	ITERATEE_ITEM
 	FOR_BODY
-
-	WHITESPACE_NODE
 )
 
 func (tt NodeType) String() string {
 	return [...]string{
 		"TEXT_NODE",
 		"VARIABLE_NODE",
+		"EXPRESSION_NODE",
+		"OP_EQUALS",
+		"OP_NOT_EQUALS",
+		"OP_AND",
+		"OP_OR",
+		"OP_LT",
+		"OP_GT",
+		"OP_LTE",
+		"OP_GTE",
+		"STRING_LITERAL_NODE",
+		"NUMBER_LITERAL_NODE",
 		"IF_NODE",
 		"THEN_BRANCH",
 		"ELIF_BRANCH",
@@ -39,7 +58,6 @@ func (tt NodeType) String() string {
 		"ITERATOR_ITEM",
 		"ITERATEE_ITEM",
 		"FOR_BODY",
-		"WHITESPACE_NODE",
 	}[tt]
 }
 
@@ -133,17 +151,72 @@ func (p *Parser) Parse() ([]Node, error) {
 					panic("Unknown KEYWORD")
 				}
 			} else if p.match(lexer.IDENTIFIER) {
-				prevVal := p.previous().Value
-				nodes = append(nodes, NewNode(VARIABLE_NODE, &prevVal))
-				p.advance() // consume '}}' of variable node
+				varNode, err := p.parseVar()
+				if err != nil {
+					return nil, fmt.Errorf("error parsing variable statement: %w", err)
+				}
+				nodes = append(nodes, varNode)
 			} else {
-				// TODO: Later this will also handle 'for' and 'identifier' token
 				return nil, fmt.Errorf("unexpected token after '{{': %v", p.peek())
 			}
 		} else {
 			return nil, fmt.Errorf("unrecognized token: %v, they should start with -> '{{'", p.peek())
 		}
 	}
+}
+
+func (p *Parser) parseVar() (Node, error) {
+	identifier := p.previous().Value
+	// If there are no expression in the curlies, it's an variable node we can bail.
+	if p.check(lexer.CLOSE_CURLY) {
+		p.advance() // Consume the closing curly
+		return Node{Type: VARIABLE_NODE, Value: &identifier}, nil
+	}
+
+	var expressionNodes []Node
+	expressionNodes = append(expressionNodes, Node{Type: VARIABLE_NODE, Value: &identifier})
+
+	for !p.check(lexer.CLOSE_CURLY) {
+		currToken := p.peek()
+		if operator, exists := lexer.Operators[currToken.Value]; exists {
+			p.advance()
+			switch operator {
+			case lexer.AMPERSAND:
+				expressionNodes = append(expressionNodes, Node{Type: OP_AND, Value: &currToken.Value})
+			case lexer.PIPE:
+				expressionNodes = append(expressionNodes, Node{Type: OP_OR, Value: &currToken.Value})
+			case lexer.EQ:
+				expressionNodes = append(expressionNodes, Node{Type: OP_EQUALS, Value: &currToken.Value})
+			case lexer.NEQ:
+				expressionNodes = append(expressionNodes, Node{Type: OP_NOT_EQUALS, Value: &currToken.Value})
+			case lexer.GT:
+				expressionNodes = append(expressionNodes, Node{Type: OP_GT, Value: &currToken.Value})
+			case lexer.LT:
+				expressionNodes = append(expressionNodes, Node{Type: OP_LT, Value: &currToken.Value})
+			case lexer.GTE:
+				expressionNodes = append(expressionNodes, Node{Type: OP_GTE, Value: &currToken.Value})
+			case lexer.LTE:
+				expressionNodes = append(expressionNodes, Node{Type: OP_LTE, Value: &currToken.Value})
+			}
+			continue
+		}
+
+		p.advance()
+		currToken = p.previous()
+
+		switch currToken.Type {
+		case lexer.STRING:
+			str := strings.Trim(currToken.Value, "'")
+			expressionNodes = append(expressionNodes, Node{Type: STRING_LITERAL_NODE, Value: &str})
+		case lexer.NUMBER:
+			expressionNodes = append(expressionNodes, Node{Type: NUMBER_LITERAL_NODE, Value: &currToken.Value})
+		case lexer.IDENTIFIER:
+			expressionNodes = append(expressionNodes, Node{Type: VARIABLE_NODE, Value: &currToken.Value})
+		}
+	}
+
+	p.advance() // Consume the closing curly
+	return Node{Type: EXPRESSION_NODE, Children: expressionNodes}, nil
 }
 
 // parseIf parses an if-else construct in the template.

@@ -48,8 +48,6 @@ func prettifyNodes(sb *strings.Builder, nodes []Node, indent int) {
 		case FOR_BODY:
 			nodeValueColor = color.New(color.FgBlue).SprintFunc()
 
-		case WHITESPACE_NODE:
-			nodeValueColor = color.New(color.FgWhite).SprintFunc()
 		default:
 			nodeValueColor = color.New(color.FgWhite).SprintFunc()
 		}

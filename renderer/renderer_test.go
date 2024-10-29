@@ -10,13 +10,13 @@ import (
 
 func TestRenderer(t *testing.T) {
 	tests := []struct {
-		context        map[string]interface{}
-		name           string
-		content        string
-		expected       string
-		errorContains  string
-		shouldError    bool
-		prettyPrintAST bool
+		context             map[string]interface{}
+		name                string
+		content             string
+		expected            string
+		errorContains       string
+		shouldError         bool
+		allowPrettyPrintAST bool
 	}{
 		// Basic functionality tests
 		{
@@ -210,8 +210,8 @@ func TestRenderer(t *testing.T) {
 			context: map[string]interface{}{
 				"items": []interface{}{"pen", "pencil", "book"},
 			},
-			expected:       "ahmet has this items:\npen\npencil\nbook",
-			prettyPrintAST: true,
+			expected:            "ahmet has this items:\npen\npencil\nbook",
+			allowPrettyPrintAST: true,
 		},
 	}
 
@@ -221,7 +221,7 @@ func TestRenderer(t *testing.T) {
 			ast, err := parser.New(tokens).Parse()
 			require.NoError(t, err, "Parser should not fail")
 
-			if tt.prettyPrintAST {
+			if tt.allowPrettyPrintAST {
 				parser.PrettifyAST(ast)
 			}
 
