@@ -29,6 +29,8 @@ var operators = map[string]TokenType{
 	"!":  BANG,
 	"(":  LPAREN,
 	")":  RPAREN,
+	"[":  OPEN_BRACKET,
+	"]":  CLOSE_BRACKET,
 }
 
 type ReadMode int
@@ -58,6 +60,8 @@ const (
 	LT
 	RPAREN
 	LPAREN
+	OPEN_BRACKET
+	CLOSE_BRACKET
 	BANG
 	NULL_COALESCE
 )
@@ -81,6 +85,8 @@ func (tt TokenType) String() string {
 		"LT",
 		"RPAREN",
 		"LPAREN",
+		"OPEN_BRACKET",
+		"CLOSE_BRACKET",
 		"BANG",
 	}[tt]
 }

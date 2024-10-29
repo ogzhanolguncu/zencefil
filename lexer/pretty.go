@@ -33,7 +33,7 @@ func prettifyTokens(sb *strings.Builder, tokens []Token, indent int) {
 			tokenValueColor = color.New(color.FgGreen).SprintFunc()
 		case OPEN_CURLY, CLOSE_CURLY:
 			tokenValueColor = color.New(color.FgRed).SprintFunc()
-		case PIPE, AMPERSAND, GT, LT, GTE, LTE, EQ, NEQ, BANG, LPAREN, RPAREN:
+		case PIPE, AMPERSAND, GT, LT, GTE, LTE, EQ, NEQ, BANG, LPAREN, RPAREN, OPEN_BRACKET, CLOSE_BRACKET:
 			tokenValueColor = color.New(color.FgYellow).SprintFunc()
 		default:
 			tokenValueColor = color.New(color.FgWhite).SprintFunc()

@@ -215,6 +215,18 @@ func TestLexerOperators(t *testing.T) {
 				{Type: CLOSE_CURLY, Value: "}}"},
 			},
 		},
+		{
+			name:  "object selection",
+			input: "{{ person['address'] }}",
+			expected: []Token{
+				{Type: OPEN_CURLY, Value: "{{"},
+				{Type: IDENTIFIER, Value: "person"},
+				{Type: OPEN_BRACKET, Value: "["},
+				{Type: STRING, Value: "address"},
+				{Type: CLOSE_BRACKET, Value: "]"},
+				{Type: CLOSE_CURLY, Value: "}}"},
+			},
+		},
 	}
 
 	for _, tt := range tests {
