@@ -25,6 +25,7 @@ var operators = map[string]TokenType{
 	"<=": LTE,
 	"==": EQ,
 	"!=": NEQ,
+	"??": NULL_COALESCE,
 	"!":  BANG,
 	"(":  LPAREN,
 	")":  RPAREN,
@@ -58,6 +59,7 @@ const (
 	RPAREN
 	LPAREN
 	BANG
+	NULL_COALESCE
 )
 
 func (tt TokenType) String() string {

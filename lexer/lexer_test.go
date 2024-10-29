@@ -203,6 +203,18 @@ func TestLexerOperators(t *testing.T) {
 				{Type: CLOSE_CURLY, Value: "}}"},
 			},
 		},
+		{
+			name:  "null coalesce operator",
+			input: "{{ !isBlocked ?? isAllowed }}",
+			expected: []Token{
+				{Type: OPEN_CURLY, Value: "{{"},
+				{Type: BANG, Value: "!"},
+				{Type: IDENTIFIER, Value: "isBlocked"},
+				{Type: NULL_COALESCE, Value: "??"},
+				{Type: IDENTIFIER, Value: "isAllowed"},
+				{Type: CLOSE_CURLY, Value: "}}"},
+			},
+		},
 	}
 
 	for _, tt := range tests {
