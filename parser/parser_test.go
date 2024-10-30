@@ -112,7 +112,7 @@ func TestParser(t *testing.T) {
 			},
 		},
 		{
-			name:    "Simple for statement",
+			name:    "for statement",
 			content: "{{for item in items}} dobby has this item:{{item}} {{endfor}}",
 			expected: []Node{
 				{Type: FOR_NODE, Children: []Node{
@@ -169,6 +169,119 @@ func TestParser(t *testing.T) {
 						{Type: TEXT_NODE, Value: ptrStr(" You are an admin and active.")},
 					}},
 				}},
+			},
+			allowPrettyPrintAST: true,
+		},
+		// {
+		// 	name:    "object access",
+		// 	content: "{{ person['address'] }}",
+		// 	expected: []Node{{
+		// 		Type: OBJECT_ACCESS_NODE,
+		// 		Children: []Node{
+		// 			{Type: VARIABLE_NODE, Value: ptrStr("person")},
+		// 			{Type: OBJECT_ACCESOR, Value: ptrStr("address")},
+		// 		},
+		// 	}},
+		// 	allowPrettyPrintAST:   true,
+		// 	allowPrettyPrintToken: true,
+		// },
+		{
+			name:    "simple nested parentheses",
+			content: "{{ (age > 18 && (role == 'admin' || role == 'moderator')) }}",
+			expected: []Node{
+				{
+					Type: EXPRESSION_NODE,
+					Children: []Node{
+						{Type: VARIABLE_NODE, Value: ptrStr("age")},
+						{Type: OP_GT, Value: ptrStr(">")},
+						{Type: NUMBER_LITERAL_NODE, Value: ptrStr("18")},
+						{Type: OP_AND, Value: ptrStr("&&")},
+						{Type: EXPRESSION_NODE, Children: []Node{
+							{Type: VARIABLE_NODE, Value: ptrStr("role")},
+							{Type: OP_EQUALS, Value: ptrStr("==")},
+							{Type: STRING_LITERAL_NODE, Value: ptrStr("admin")},
+							{Type: OP_OR, Value: ptrStr("||")},
+							{Type: VARIABLE_NODE, Value: ptrStr("role")},
+							{Type: OP_EQUALS, Value: ptrStr("==")},
+							{Type: STRING_LITERAL_NODE, Value: ptrStr("moderator")},
+						}},
+					},
+				},
+			},
+		},
+		{
+			name:    "variable with bang",
+			content: "{{ !is_banned }}",
+			expected: []Node{
+				{
+					Type: EXPRESSION_NODE,
+					Children: []Node{
+						{
+							Type:  OP_BANG,
+							Value: ptrStr("!"),
+						}, {
+							Type:  VARIABLE_NODE,
+							Value: ptrStr("is_banned"),
+						},
+					},
+				},
+			},
+		},
+		{
+			name:    "deeply nested parentheses",
+			content: "{{ (((!is_banned) && is_active) || (is_admin && (permission == 'write'))) }}",
+			expected: []Node{
+				{
+					Type: EXPRESSION_NODE,
+					Children: []Node{
+						{Type: EXPRESSION_NODE, Children: []Node{
+							{Type: EXPRESSION_NODE, Children: []Node{
+								{Type: OP_BANG, Value: ptrStr("!")},
+								{Type: VARIABLE_NODE, Value: ptrStr("is_banned")},
+							}},
+							{Type: OP_AND, Value: ptrStr("&&")},
+							{Type: VARIABLE_NODE, Value: ptrStr("is_active")},
+						}},
+						{Type: OP_OR, Value: ptrStr("||")},
+						{Type: EXPRESSION_NODE, Children: []Node{
+							{Type: VARIABLE_NODE, Value: ptrStr("is_admin")},
+							{Type: OP_AND, Value: ptrStr("&&")},
+							{Type: EXPRESSION_NODE, Children: []Node{
+								{Type: VARIABLE_NODE, Value: ptrStr("permission")},
+								{Type: OP_EQUALS, Value: ptrStr("==")},
+								{Type: STRING_LITERAL_NODE, Value: ptrStr("write")},
+							}},
+						}},
+					},
+				},
+			},
+		},
+		{
+			name:    "mixed operators with nested parentheses",
+			content: "{{ (count > 0 && (status == 'active' || status == 'pending')) ?? 'no-data' }}",
+			expected: []Node{
+				{
+					Type: EXPRESSION_NODE,
+					Children: []Node{
+						{Type: EXPRESSION_NODE, Children: []Node{
+							{Type: VARIABLE_NODE, Value: ptrStr("count")},
+							{Type: OP_GT, Value: ptrStr(">")},
+							{Type: NUMBER_LITERAL_NODE, Value: ptrStr("0")},
+							{Type: OP_AND, Value: ptrStr("&&")},
+							{Type: EXPRESSION_NODE, Children: []Node{
+								{Type: VARIABLE_NODE, Value: ptrStr("status")},
+								{Type: OP_EQUALS, Value: ptrStr("==")},
+								{Type: STRING_LITERAL_NODE, Value: ptrStr("active")},
+								{Type: OP_OR, Value: ptrStr("||")},
+								{Type: VARIABLE_NODE, Value: ptrStr("status")},
+								{Type: OP_EQUALS, Value: ptrStr("==")},
+								{Type: STRING_LITERAL_NODE, Value: ptrStr("pending")},
+							}},
+						}},
+						{Type: OP_NULL_COALESCE, Value: ptrStr("??")},
+						{Type: STRING_LITERAL_NODE, Value: ptrStr("no-data")},
+					},
+				},
 			},
 		},
 	}
