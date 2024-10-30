@@ -18,13 +18,14 @@ func TestParser(t *testing.T) {
 		shouldError           bool
 	}{
 		{
-			name:    "Simple if statement",
+			name:    "if statement",
 			content: "Hello, {{ name }}! {{ if is_admin }} You are an admin.{{ endif }} {{ surname }}",
 			expected: []Node{
 				{Type: TEXT_NODE, Value: ptrStr("Hello, ")},
 				{Type: VARIABLE_NODE, Value: ptrStr("name")},
 				{Type: TEXT_NODE, Value: ptrStr("! ")},
-				{Type: IF_NODE, Value: ptrStr("is_admin"), Children: []Node{
+				{Type: IF_NODE, Children: []Node{
+					{Type: VARIABLE_NODE, Value: ptrStr("is_admin")},
 					{Type: THEN_BRANCH, Value: nil, Children: []Node{
 						{Type: TEXT_NODE, Value: ptrStr(" You are an admin.")},
 					}},
@@ -34,19 +35,22 @@ func TestParser(t *testing.T) {
 			},
 		},
 		{
-			name:    "Simple if-elseif-else statement",
+			name:    "elif statement",
 			content: "Hello {{ if is_admin }}admin{{ elif is_super }}super{{ elif is_user }}user{{ else }}guest{{ endif }}!",
 			expected: []Node{
 				{Type: TEXT_NODE, Value: ptrStr("Hello ")},
-				{Type: IF_NODE, Value: ptrStr("is_admin"), Children: []Node{
+				{Type: IF_NODE, Children: []Node{
+					{Type: VARIABLE_NODE, Value: ptrStr("is_admin")},
 					{Type: THEN_BRANCH, Value: nil, Children: []Node{
 						{Type: TEXT_NODE, Value: ptrStr("admin")},
 					}},
 					{Type: ELIF_BRANCH, Value: nil, Children: []Node{
-						{Type: ELIF_ITEM, Value: ptrStr("is_super"), Children: []Node{
+						{Type: ELIF_ITEM, Children: []Node{
+							{Type: VARIABLE_NODE, Value: ptrStr("is_super")},
 							{Type: TEXT_NODE, Value: ptrStr("super")},
 						}},
-						{Type: ELIF_ITEM, Value: ptrStr("is_user"), Children: []Node{
+						{Type: ELIF_ITEM, Children: []Node{
+							{Type: VARIABLE_NODE, Value: ptrStr("is_user")},
 							{Type: TEXT_NODE, Value: ptrStr("user")},
 						}},
 					}},
@@ -78,32 +82,20 @@ func TestParser(t *testing.T) {
 			shouldError: true,
 		},
 		{
-			name:    "If-else statement",
-			content: "Hello, {{ if is_admin }} You are an admin. {{ else }} You are not an admin. {{ endif }}",
-			expected: []Node{
-				{Type: TEXT_NODE, Value: ptrStr("Hello, ")},
-				{Type: IF_NODE, Value: ptrStr("is_admin"), Children: []Node{
-					{Type: THEN_BRANCH, Value: nil, Children: []Node{
-						{Type: TEXT_NODE, Value: ptrStr(" You are an admin. ")},
-					}},
-					{Type: ELSE_BRANCH, Value: nil, Children: []Node{
-						{Type: TEXT_NODE, Value: ptrStr(" You are not an admin. ")},
-					}},
-				}},
-			},
-		},
-		{
 			name:    "Nested if-else statement",
 			content: `Hello, {{ if is_admin }} You are an admin. {{ if is_super_admin}} SuperAdminIsComing {{ if is_super_super_admin}} Yessssss! {{endif}} {{endif}} {{ else }} You are not an admin. {{ endif }}`,
 			expected: []Node{
 				{Type: TEXT_NODE, Value: ptrStr("Hello, ")},
-				{Type: IF_NODE, Value: ptrStr("is_admin"), Children: []Node{
+				{Type: IF_NODE, Children: []Node{
+					{Type: VARIABLE_NODE, Value: ptrStr("is_admin")},
 					{Type: THEN_BRANCH, Value: nil, Children: []Node{
 						{Type: TEXT_NODE, Value: ptrStr(" You are an admin. ")},
-						{Type: IF_NODE, Value: ptrStr("is_super_admin"), Children: []Node{
+						{Type: IF_NODE, Children: []Node{
+							{Type: VARIABLE_NODE, Value: ptrStr("is_super_admin")},
 							{Type: THEN_BRANCH, Value: nil, Children: []Node{
 								{Type: TEXT_NODE, Value: ptrStr(" SuperAdminIsComing ")},
-								{Type: IF_NODE, Value: ptrStr("is_super_super_admin"), Children: []Node{
+								{Type: IF_NODE, Children: []Node{
+									{Type: VARIABLE_NODE, Value: ptrStr("is_super_super_admin")},
 									{Type: THEN_BRANCH, Value: nil, Children: []Node{
 										{Type: TEXT_NODE, Value: ptrStr(" Yessssss! ")},
 									}},
@@ -136,7 +128,7 @@ func TestParser(t *testing.T) {
 		},
 		{
 			name:    "variable with complex expression",
-			content: "Hello, {{ name == 'dobby' && age > 18 || is_wizard }}",
+			content: "Hello, {{ name == 'dobby' && age > 18 || !is_wizard ?? 'nope' }}",
 			expected: []Node{
 				{Type: TEXT_NODE, Value: ptrStr("Hello, ")},
 				{
@@ -155,35 +147,30 @@ func TestParser(t *testing.T) {
 						// OR operator
 						{Type: OP_OR, Value: ptrStr("||")},
 						// Third condition
+						{Type: OP_BANG, Value: ptrStr("!")},
 						{Type: VARIABLE_NODE, Value: ptrStr("is_wizard")},
+						{Type: OP_NULL_COALESCE, Value: ptrStr("??")},
+						{Type: STRING_LITERAL_NODE, Value: ptrStr("nope")},
 					},
 				},
 			},
 		},
-		// {
-		// 	name:    "if with expression",
-		// 	content: "{{ if is_admin && is_active}} You are an admin and active.{{ endif }}",
-		// 	expected: []Node{
-		// 		{Type: TEXT_NODE, Children: []Node{
-		// 			{Type: EXPRESSION_NODE, Children: []Node{
-		// 				{Type: VARIABLE_NODE, Value: ptrStr("name")},
-		// 				{Type: OP_NODE, Value: ptrStr("==")},
-		// 				{Type: STRING_LITERAL_NODE, Value: ptrStr("dobby")},
-		// 			}},
-		// 		}},
-		// 		{Type: TEXT_NODE, Value: ptrStr(" ")}, // Added space between expressions
-		// 		{Type: IF_NODE, Children: []Node{
-		// 			{Type: EXPRESSION_NODE, Children: []Node{
-		// 				{Type: VARIABLE_NODE, Value: ptrStr("is_admin")},
-		// 				{Type: OP_NODE, Value: ptrStr("&&")},
-		// 				{Type: VARIABLE_NODE, Value: ptrStr("is_active")},
-		// 			}},
-		// 			{Type: THEN_BRANCH, Children: []Node{
-		// 				{Type: TEXT_NODE, Value: ptrStr(" You are an admin and active.")},
-		// 			}},
-		// 		}},
-		// 	},
-		// },
+		{
+			name:    "if with expression",
+			content: "{{ if is_admin && is_active}} You are an admin and active.{{ endif }}",
+			expected: []Node{
+				{Type: IF_NODE, Children: []Node{
+					{Type: EXPRESSION_NODE, Children: []Node{
+						{Type: VARIABLE_NODE, Value: ptrStr("is_admin")},
+						{Type: OP_AND, Value: ptrStr("&&")},
+						{Type: VARIABLE_NODE, Value: ptrStr("is_active")},
+					}},
+					{Type: THEN_BRANCH, Children: []Node{
+						{Type: TEXT_NODE, Value: ptrStr(" You are an admin and active.")},
+					}},
+				}},
+			},
+		},
 	}
 
 	for _, tt := range tests {

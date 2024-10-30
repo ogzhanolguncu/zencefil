@@ -21,6 +21,8 @@ const (
 	OP_GT
 	OP_LTE
 	OP_GTE
+	OP_BANG
+	OP_NULL_COALESCE
 	STRING_LITERAL_NODE
 	NUMBER_LITERAL_NODE
 	IF_NODE
@@ -33,6 +35,11 @@ const (
 	ITERATEE_ITEM
 	FOR_BODY
 )
+
+// RPAREN
+// LPAREN
+// OPEN_BRACKET
+// CLOSE_BRACKET
 
 func (tt NodeType) String() string {
 	return [...]string{
@@ -47,6 +54,8 @@ func (tt NodeType) String() string {
 		"OP_GT",
 		"OP_LTE",
 		"OP_GTE",
+		"OP_BANG",
+		"OP_NULL_COALESCE",
 		"STRING_LITERAL_NODE",
 		"NUMBER_LITERAL_NODE",
 		"IF_NODE",
@@ -75,8 +84,11 @@ func NewNode(nodeType NodeType, value *string, children ...Node) Node {
 	}
 }
 
-func NewIfNode(condition *string, thenBranch, elifBranch, elseBranch Node) Node {
+func NewIfNode(condition, thenBranch, elifBranch, elseBranch Node) Node {
 	var children []Node
+
+	// Condition is either variable or expression node
+	children = append(children, condition)
 
 	// Add THEN_BRANCH even if empty
 	children = append(children, NewNode(THEN_BRANCH, nil, thenBranch.Children...))
@@ -93,7 +105,6 @@ func NewIfNode(condition *string, thenBranch, elifBranch, elseBranch Node) Node 
 
 	return Node{
 		Type:     IF_NODE,
-		Value:    condition,
 		Children: children,
 	}
 }
@@ -151,7 +162,7 @@ func (p *Parser) Parse() ([]Node, error) {
 					panic("Unknown KEYWORD")
 				}
 			} else if p.match(lexer.IDENTIFIER) {
-				varNode, err := p.parseVar()
+				varNode, err := p.parseCondOrExpr()
 				if err != nil {
 					return nil, fmt.Errorf("error parsing variable statement: %w", err)
 				}
@@ -165,7 +176,7 @@ func (p *Parser) Parse() ([]Node, error) {
 	}
 }
 
-func (p *Parser) parseVar() (Node, error) {
+func (p *Parser) parseCondOrExpr() (Node, error) {
 	identifier := p.previous().Value
 	// If there are no expression in the curlies, it's an variable node we can bail.
 	if p.check(lexer.CLOSE_CURLY) {
@@ -197,6 +208,10 @@ func (p *Parser) parseVar() (Node, error) {
 				expressionNodes = append(expressionNodes, Node{Type: OP_GTE, Value: &currToken.Value})
 			case lexer.LTE:
 				expressionNodes = append(expressionNodes, Node{Type: OP_LTE, Value: &currToken.Value})
+			case lexer.BANG:
+				expressionNodes = append(expressionNodes, Node{Type: OP_BANG, Value: &currToken.Value})
+			case lexer.NULL_COALESCE:
+				expressionNodes = append(expressionNodes, Node{Type: OP_NULL_COALESCE, Value: &currToken.Value})
 			}
 			continue
 		}
@@ -229,12 +244,13 @@ func (p *Parser) parseVar() (Node, error) {
 // Each block is parsed as a separate template, allowing for nested if-else constructs.
 // Returns a Node representing the entire if-else structure.
 func (p *Parser) parseIf() (Node, error) {
-	condition, err := p.expectIfIdentifier()
+	_, err := p.expectIfIdentifier()
 	if err != nil {
 		return Node{}, err
 	}
 
-	if err := p.expectCloseCurly(); err != nil {
+	condition, err := p.parseCondOrExpr()
+	if err != nil {
 		return Node{}, err
 	}
 
@@ -264,7 +280,7 @@ func (p *Parser) parseIf() (Node, error) {
 		return Node{}, err
 	}
 
-	return NewIfNode(&condition,
+	return NewIfNode(condition,
 		NewNode(THEN_BRANCH, nil, thenBlock...),
 		NewNode(ELIF_BRANCH, nil, elifNodes...),
 		elseBlock), nil
@@ -321,21 +337,24 @@ func (p *Parser) parseElif() (Node, error) {
 	p.advance() // {{
 	p.advance() // elif
 
-	condition, err := p.expectIfIdentifier()
+	_, err := p.expectElifIdentifier()
 	if err != nil {
 		return Node{}, err
 	}
-
-	if err := p.expectCloseCurly(); err != nil {
+	var nodes []Node
+	condition, err := p.parseCondOrExpr()
+	if err != nil {
 		return Node{}, err
 	}
+	nodes = append(nodes, condition)
 
 	block, err := p.parseBlock()
 	if err != nil {
 		return Node{}, fmt.Errorf("error parsing elif block: %w", err)
 	}
+	nodes = append(nodes, block...)
 
-	return NewNode(ELIF_ITEM, &condition, block...), nil
+	return NewNode(ELIF_ITEM, nil, nodes...), nil
 }
 
 func (p *Parser) parseBlock() ([]Node, error) {
@@ -400,6 +419,13 @@ func (p *Parser) isEndForKeyword() bool {
 func (p *Parser) expectIfIdentifier() (string, error) {
 	if !p.match(lexer.IDENTIFIER) {
 		return "", fmt.Errorf("expected condition after 'if', got %v", p.peek())
+	}
+	return p.previous().Value, nil
+}
+
+func (p *Parser) expectElifIdentifier() (string, error) {
+	if !p.match(lexer.IDENTIFIER) {
+		return "", fmt.Errorf("expected condition after 'elif', got %v", p.peek())
 	}
 	return p.previous().Value, nil
 }
