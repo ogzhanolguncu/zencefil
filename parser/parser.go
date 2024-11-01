@@ -385,13 +385,9 @@ func (p *Parser) parseElse() (Node, error) {
 }
 
 func (p *Parser) parseElif() (Node, error) {
-	p.advance() // {{
-	p.advance() // elif
+	p.advance() // consume {{
+	p.advance() // consume elif
 
-	_, err := p.expectElifIdentifier()
-	if err != nil {
-		return Node{}, err
-	}
 	var nodes []Node
 	condition, err := p.parseCondOrExpr()
 	if err != nil {
