@@ -208,7 +208,21 @@ func (p *Parser) parseExpression() (Node, error) {
 		case lexer.IDENTIFIER:
 			p.advance()
 			val := p.previous().Value
-			nodes = append(nodes, Node{Type: VARIABLE_NODE, Value: &val})
+			if p.check(lexer.OPEN_BRACKET) {
+				p.advance() // Consume '['
+				p.advance() // Consume 'string' token for objAccessor
+				objAccessor := p.previous()
+				if objAccessor.Type != lexer.STRING {
+					return Node{}, fmt.Errorf("object accessor has to be STRING token, but its %v", objAccessor.Type)
+				}
+				objNode := Node{Type: OBJECT_ACCESS_NODE}
+				objNode.Children = []Node{{Type: VARIABLE_NODE, Value: &val}, {Type: OBJECT_ACCESOR, Value: &objAccessor.Value}}
+				p.advance() // Consume ']'
+
+				nodes = append(nodes, objNode)
+			} else {
+				nodes = append(nodes, Node{Type: VARIABLE_NODE, Value: &val})
+			}
 
 		case lexer.STRING:
 			p.advance()
@@ -272,7 +286,7 @@ func (p *Parser) createOperatorNode(op lexer.TokenType, value *string) Node {
 
 func (p *Parser) parseCondOrExpr() (Node, error) {
 	identifier := p.previous().Value
-	// If there are no expression in the curlies, it's an variable node we can bail.
+	// If there are no expression in the curlies, it's an variable node so we can bail.
 	if p.check(lexer.CLOSE_CURLY) {
 		p.advance() // Consume the closing curly
 		return Node{Type: VARIABLE_NODE, Value: &identifier}, nil

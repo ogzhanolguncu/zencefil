@@ -172,19 +172,26 @@ func TestParser(t *testing.T) {
 			},
 			allowPrettyPrintAST: true,
 		},
-		// {
-		// 	name:    "object access",
-		// 	content: "{{ person['address'] }}",
-		// 	expected: []Node{{
-		// 		Type: OBJECT_ACCESS_NODE,
-		// 		Children: []Node{
-		// 			{Type: VARIABLE_NODE, Value: ptrStr("person")},
-		// 			{Type: OBJECT_ACCESOR, Value: ptrStr("address")},
-		// 		},
-		// 	}},
-		// 	allowPrettyPrintAST:   true,
-		// 	allowPrettyPrintToken: true,
-		// },
+		{
+			name:    "object access",
+			content: "{{ person['address'] ?? 'Istanbul' }}",
+			expected: []Node{{
+				Type: EXPRESSION_NODE,
+				Children: []Node{{
+					Type: OBJECT_ACCESS_NODE,
+					Children: []Node{
+						{Type: VARIABLE_NODE, Value: ptrStr("person")},
+						{Type: OBJECT_ACCESOR, Value: ptrStr("address")},
+					},
+				}, {
+					Type:  OP_NULL_COALESCE,
+					Value: ptrStr("??"),
+				}, {
+					Type:  STRING_LITERAL_NODE,
+					Value: ptrStr("Istanbul"),
+				}},
+			}},
+		},
 		{
 			name:    "simple nested parentheses",
 			content: "{{ (age > 18 && (role == 'admin' || role == 'moderator')) }}",
