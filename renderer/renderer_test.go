@@ -210,8 +210,7 @@ func TestRenderer(t *testing.T) {
 			context: map[string]interface{}{
 				"items": []interface{}{"pen", "pencil", "book"},
 			},
-			expected:            "ahmet has this items:\npen\npencil\nbook",
-			allowPrettyPrintAST: true,
+			expected: "ahmet has this items:\npen\npencil\nbook",
 		},
 	}
 

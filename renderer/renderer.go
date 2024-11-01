@@ -146,11 +146,12 @@ func (r *Renderer) renderForNode(node parser.Node) (string, error) {
 
 // renderIfNode handles rendering if/elif/else conditional blocks
 func (r *Renderer) renderIfNode(node parser.Node) (string, error) {
-	if node.Value == nil {
-		return "", &RenderError{Message: "if node has nil value", Node: node}
+	conditionNode := node.Children[0]
+	if conditionNode.Type != parser.VARIABLE_NODE {
+		return "", &RenderError{Message: "if node has nil condition", Node: node}
 	}
 
-	condition, err := r.evaluateCondition(*node.Value)
+	condition, err := r.evaluateCondition(*conditionNode.Value)
 	if err != nil {
 		return "", err
 	}
@@ -178,11 +179,14 @@ func (r *Renderer) renderElifBranches(nodes []parser.Node) (string, error) {
 		}
 
 		for _, elifNode := range node.Children {
-			if elifNode.Value == nil {
-				return "", &RenderError{Message: "elif node has nil value", Node: elifNode}
+			conditionNode, elifNodeChildren, _ := getFirst(elifNode.Children)
+			elifNode.Children = elifNodeChildren
+
+			if conditionNode.Type != parser.VARIABLE_NODE {
+				return "", &RenderError{Message: "if node has nil condition", Node: node}
 			}
 
-			condition, err := r.evaluateCondition(*elifNode.Value)
+			condition, err := r.evaluateCondition(*conditionNode.Value)
 			if err != nil {
 				return "", err
 			}
@@ -228,4 +232,11 @@ func (r *Renderer) evaluateCondition(key string) (bool, error) {
 func (r *Renderer) variableLookup(key string) (interface{}, bool) {
 	value, exists := r.Context[key]
 	return value, exists
+}
+
+func getFirst[T any](slice []T) (first T, rest []T, ok bool) {
+	if len(slice) == 0 {
+		return first, rest, false
+	}
+	return slice[0], slice[1:], true
 }
