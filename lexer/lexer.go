@@ -138,6 +138,27 @@ func (l *Lexer) Tokenize() []Token {
 			}
 
 		case TagMode:
+			if char == '\'' {
+				// Start of a string literal
+				sb.WriteRune(char)
+				for {
+					innerChar, ok := l.advance()
+					if !ok {
+						break
+					}
+					sb.WriteRune(innerChar)
+					if innerChar == '\'' {
+						// End of string literal found
+						str := sb.String()
+						content := strings.Trim(str, "'") // Remove surrounding quotes
+						l.Tokens = append(l.Tokens, Token{Value: content, Type: STRING})
+						sb.Reset()
+						break
+					}
+				}
+				continue
+			}
+
 			if unicode.IsSpace(char) {
 				if sb.Len() > 0 {
 					l.addToken(sb.String())
@@ -145,7 +166,6 @@ func (l *Lexer) Tokenize() []Token {
 				}
 				continue
 			}
-
 			if char == '}' {
 				peek, _ := l.peek()
 				if peek == '}' {

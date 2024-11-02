@@ -155,12 +155,12 @@ func TestLexerOperators(t *testing.T) {
 		},
 		{
 			name:  "equality operators",
-			input: "{{ name == 'John' && role != 'guest' }}",
+			input: "{{ name == 'John Weak' && role != 'guest' }}",
 			expected: []Token{
 				{Type: OPEN_CURLY, Value: "{{"},
 				{Type: IDENTIFIER, Value: "name"},
 				{Type: EQ, Value: "=="},
-				{Type: STRING, Value: "John"},
+				{Type: STRING, Value: "John Weak"},
 				{Type: AMPERSAND, Value: "&&"},
 				{Type: IDENTIFIER, Value: "role"},
 				{Type: NEQ, Value: "!="},

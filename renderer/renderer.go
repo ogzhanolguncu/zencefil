@@ -105,7 +105,6 @@ func (r *Renderer) renderNode(node parser.Node) (string, error) {
 		if !ok {
 			return "", &RenderError{Message: fmt.Sprintf("object '%v' is missing", objVar)}
 		}
-		// Use type switch to handle different map types
 		switch m := obj.(type) {
 		case map[string]interface{}:
 			if val, exists := m[*objAccessor]; exists {
@@ -326,6 +325,30 @@ func (r *Renderer) evaluateExpression(node parser.Node) (interface{}, error) {
 			operandStack = append(operandStack, value)
 			applyPendingBang(&operandStack, &operatorStack)
 
+		case parser.OBJECT_ACCESS_NODE:
+			objVar := v.Children[0]
+			objAccessor := v.Children[1].Value
+
+			obj, ok := r.variableLookup(*objVar.Value)
+			if !ok {
+				return "", &RenderError{Message: fmt.Sprintf("object '%v' is missing", objVar)}
+			}
+
+			switch m := obj.(type) {
+			case map[string]interface{}:
+				if val, exists := m[*objAccessor]; exists {
+					operandStack = append(operandStack, val)
+					applyPendingBang(&operandStack, &operatorStack)
+				}
+			case map[interface{}]interface{}:
+				if val, exists := m[*objAccessor]; exists {
+					operandStack = append(operandStack, val)
+					applyPendingBang(&operandStack, &operatorStack)
+				}
+			default:
+				return "", &RenderError{Message: fmt.Sprintf("object '%v' is not a map type", objVar)}
+			}
+
 		case parser.EXPRESSION_NODE:
 			value, err := r.evaluateExpression(v)
 			if err != nil {
@@ -350,7 +373,7 @@ func (r *Renderer) evaluateExpression(node parser.Node) (interface{}, error) {
 			operatorStack = append(operatorStack, parser.OP_BANG)
 
 		case parser.OP_AND, parser.OP_OR, parser.OP_EQUALS, parser.OP_NOT_EQUALS,
-			parser.OP_GT, parser.OP_LT, parser.OP_GTE, parser.OP_LTE:
+			parser.OP_GT, parser.OP_LT, parser.OP_GTE, parser.OP_LTE, parser.OP_NULL_COALESCE:
 			// Evaluate immediately if operator has higher or equal precedence
 			for len(operatorStack) > 0 && hasHigherPrecedence(operatorStack[len(operatorStack)-1], v.Type) {
 				err := evaluateTopOperator(&operandStack, &operatorStack)
@@ -531,6 +554,13 @@ func evaluateTopOperator(operandStack *[]interface{}, operatorStack *[]parser.No
 			result = left
 		} else {
 			result = right
+		}
+	case parser.OP_NULL_COALESCE:
+		// If left is nil or "empty", return right, otherwise return left
+		if left == nil || !isTruthy(left) {
+			result = right
+		} else {
+			result = left
 		}
 	case parser.OP_EQUALS:
 		result = compareValues(left, right) == 0
