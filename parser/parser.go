@@ -284,23 +284,8 @@ func (p *Parser) createOperatorNode(op lexer.TokenType, value *string) Node {
 	return Node{Type: opTypeMap[op], Value: value}
 }
 
-func (p *Parser) parseCondOrExpr() (Node, error) {
-	identifier := p.previous().Value
-	// If there are no expression in the curlies, it's an variable node so we can bail.
-	if p.check(lexer.CLOSE_CURLY) {
-		p.advance() // Consume the closing curly
-		return Node{Type: VARIABLE_NODE, Value: &identifier}, nil
-	}
-
-	expr, err := p.parseExpression()
-	if err != nil {
-		return Node{}, err
-	}
-	return expr, nil
-}
-
 func (p *Parser) parseIf() (Node, error) {
-	condition, err := p.parseCondOrExpr()
+	condition, err := p.parseExpression()
 	if err != nil {
 		return Node{}, err
 	}
@@ -389,7 +374,7 @@ func (p *Parser) parseElif() (Node, error) {
 	p.advance() // consume elif
 
 	var nodes []Node
-	condition, err := p.parseCondOrExpr()
+	condition, err := p.parseExpression()
 	if err != nil {
 		return Node{}, err
 	}
@@ -430,9 +415,13 @@ func (p *Parser) parseBlock() ([]Node, error) {
 					panic("Unknown KEYWORD")
 				}
 			} else if p.match(lexer.IDENTIFIER) {
-				prevVal := p.previous().Value
-				nodes = append(nodes, NewNode(VARIABLE_NODE, &prevVal))
-				p.advance() // consume '}}' of variable node
+				// In order for 'parseExpression' to parse IDENTIFIER it has to match. And, it won't match without going a step back.
+				p.crrPos--
+				node, err := p.parseExpression()
+				if err != nil {
+					return nil, err
+				}
+				nodes = append(nodes, node)
 			} else {
 				return nil, fmt.Errorf("unexpected token after '{{': %v", p.peek())
 			}

@@ -275,6 +275,35 @@ func TestRenderer(t *testing.T) {
 			},
 			expected: "ahmet has this items:\npen\npencil\nbook",
 		},
+		// Object access
+		{
+			name:    "Basic object access",
+			content: "{{ person['address'] }}",
+			context: map[string]interface{}{
+				"person": map[string]interface{}{
+					"address": "Istanbul",
+				},
+			},
+			expected: "Istanbul",
+		},
+		{
+			name:    "Loop with object access",
+			content: "Users:{{for user in users}}\n{{ user['name'] }}: {{user['address']}}{{endfor}}",
+			context: map[string]interface{}{
+				"users": []interface{}{
+					map[string]interface{}{
+						"name":    "John",
+						"address": "New York",
+					},
+					map[string]interface{}{
+						"name":    "Alice",
+						"address": "London",
+					},
+				},
+			},
+			allowPrettyPrintAST: true,
+			expected:            "Users:\nJohn: New York\nAlice: London",
+		},
 	}
 
 	for _, tt := range tests {

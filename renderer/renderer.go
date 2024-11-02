@@ -8,9 +8,6 @@ import (
 	"github.com/ogzhanolguncu/zencefil/parser"
 )
 
-// TODO: Object access
-// TODO: iterating over object in for
-// TODO: expression evaluation in variable
 func hasHigherPrecedence(op1, op2 parser.NodeType) bool {
 	precedence := map[parser.NodeType]int{
 		parser.OP_BANG:       5,
@@ -100,6 +97,29 @@ func (r *Renderer) renderNode(node parser.Node) (string, error) {
 		}
 		return fmt.Sprintf("%v", variable), nil
 
+	case parser.OBJECT_ACCESS_NODE:
+		objVar := node.Children[0]
+		objAccessor := node.Children[1].Value
+
+		obj, ok := r.variableLookup(*objVar.Value)
+		if !ok {
+			return "", &RenderError{Message: fmt.Sprintf("object '%v' is missing", objVar)}
+		}
+		// Use type switch to handle different map types
+		switch m := obj.(type) {
+		case map[string]interface{}:
+			if val, exists := m[*objAccessor]; exists {
+				return fmt.Sprintf("%v", val), nil
+			}
+		case map[interface{}]interface{}:
+			if val, exists := m[*objAccessor]; exists {
+				return fmt.Sprintf("%v", val), nil
+			}
+		default:
+			return "", &RenderError{Message: fmt.Sprintf("object '%v' is not a map type", objVar)}
+		}
+
+		return "", &RenderError{Message: fmt.Sprintf("key '%s' not found in object '%v'", *objAccessor, objVar)}
 	case parser.EXPRESSION_NODE:
 		expr, err := r.evaluateExpression(node)
 		if err != nil {
@@ -123,45 +143,33 @@ func (r *Renderer) renderNode(node parser.Node) (string, error) {
 
 func (r *Renderer) renderForNode(node parser.Node) (string, error) {
 	var iteratee string
-	var iterator []interface{}
 	var sb strings.Builder
 
-	for _, forNode := range node.Children {
-		switch forNode.Type {
-		case parser.ITERATEE_ITEM:
-			if forNode.Value == nil {
-				return "", &RenderError{Message: "iteratee item has nil value", Node: forNode}
-			}
-			iteratee = *forNode.Value
+	if node.Children[0].Value == nil {
+		return "", &RenderError{Message: "iteratee item has nil value", Node: node.Children[0]}
+	}
+	iteratee = *node.Children[0].Value
 
-		case parser.ITERATOR_ITEM:
-			if forNode.Value == nil {
-				return "", &RenderError{Message: "iterator item has nil value", Node: forNode}
-			}
-			variable, found := r.variableLookup(*forNode.Value)
-			if !found {
-				return "", &RenderError{
-					Message: fmt.Sprintf("iterator variable '%s' not found in context", *forNode.Value),
-				}
-			}
-			var ok bool
-			iterator, ok = variable.([]interface{})
-			if !ok {
-				return "", &RenderError{
-					Message: fmt.Sprintf("iterator must be a slice, got %T", variable),
-				}
-			}
+	if node.Children[1].Value == nil {
+		return "", &RenderError{Message: "iterator item has nil value", Node: node.Children[1]}
+	}
+	variable, found := r.variableLookup(*node.Children[1].Value)
+	if !found {
+		return "", &RenderError{
+			Message: fmt.Sprintf("iterator variable '%s' not found in context", *node.Children[1].Value),
 		}
 	}
 
-	for _, forNode := range node.Children {
-		if forNode.Type == parser.FOR_BODY {
+	switch m := variable.(type) {
+	case []interface{}:
+		forBody := node.Children[2]
+		if forBody.Type == parser.FOR_BODY {
 			// Store original value to restore after loop
 			originalValue, hadOriginal := r.Context[iteratee]
 
-			for _, item := range iterator {
+			for _, item := range m {
 				r.Context[iteratee] = item
-				rendered, err := r.renderNodes(forNode.Children)
+				rendered, err := r.renderNodes(forBody.Children)
 				if err != nil {
 					return "", &RenderError{
 						Message: fmt.Sprintf("error in for loop: %v", err),
@@ -170,7 +178,6 @@ func (r *Renderer) renderForNode(node parser.Node) (string, error) {
 				}
 				sb.WriteString(rendered)
 			}
-
 			// Restore original context
 			if hadOriginal {
 				r.Context[iteratee] = originalValue
@@ -178,6 +185,9 @@ func (r *Renderer) renderForNode(node parser.Node) (string, error) {
 				delete(r.Context, iteratee)
 			}
 		}
+
+	default:
+		return "", &RenderError{Message: "something went wrong in for loop"}
 	}
 
 	return sb.String(), nil
