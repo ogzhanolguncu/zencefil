@@ -63,12 +63,68 @@ func TestRenderer(t *testing.T) {
 
 		// Conditional tests
 		{
-			name:    "Simple if statement",
-			content: "{{ if isAdmin }}Admin{{ endif }}",
+			name: "Complex nested",
+			content: `
+        {{ if (age >= 18 && (role == 'admin' || role == 'moderator') && !isBlocked) }}
+            Full Access
+        {{ elif (age >= 16 && role == 'junior-mod' && totalPosts > 100) || (isPremium && trustScore > 8.5) }}
+            Limited Access
+        {{ elif age > 13 && !isRestricted }}
+            Basic Access
+        {{ else }}
+            No Access
+        {{ endif }}
+    `,
 			context: map[string]interface{}{
-				"isAdmin": true,
+				"age":          14,
+				"role":         "junior-mod",
+				"isBlocked":    false,
+				"isPremium":    false,
+				"trustScore":   9.0,
+				"totalPosts":   150,
+				"isRestricted": false,
 			},
-			expected: "Admin",
+			expected: "\n        \n            Basic Access\n        \n    ",
+		},
+		{
+			name: "Complex nested with content access levels",
+			content: `
+				{{ if (isPremiumContent && (userType == 'subscriber' || creditsRemaining > 0) && !isRegionLocked) }}
+					{{ if deviceType == 'mobile' }}
+						Mobile Optimized Content
+						{{ if networkSpeed == 'high' }}
+							HD Quality Available
+						{{ else }}
+							SD Quality Only
+						{{ endif }}
+					{{ elif deviceType == 'desktop' }}
+						Full Desktop Experience
+						{{ if hasHighResDisplay }}
+							4K Available
+						{{ endif }}
+					{{ else }}
+						Standard Quality Stream
+					{{ endif }}
+				{{ elif (isFreeContent && !requiresLogin) || (isPreview && previewTimeRemaining > 0) }}
+					Preview Content Available
+				{{ else }}
+					Subscription Required
+				{{ endif }}
+			`,
+			context: map[string]interface{}{
+				"isPremiumContent":     true,
+				"userType":             "subscriber",
+				"creditsRemaining":     5,
+				"isRegionLocked":       false,
+				"deviceType":           "desktop",
+				"hasHighResDisplay":    true,
+				"networkSpeed":         "high",
+				"isFreeContent":        false,
+				"requiresLogin":        true,
+				"isPreview":            false,
+				"previewTimeRemaining": 0,
+			},
+			expected: "\n\t\t\t\t\n\t\t\t\t\t\n\t\t\t\t\t\tFull Desktop Experience\n\t\t\t\t\t\t\n\t\t\t\t\t\t\t4K Available\n\t\t\t\t\t\t\n\t\t\t\t\t\n\t\t\t\t\n\t\t\t",
 		},
 		{
 			name:    "If statement with false condition",
@@ -98,13 +154,13 @@ func TestRenderer(t *testing.T) {
 		// Complex conditional tests
 		{
 			name:    "Multiple elif branches with first true",
-			content: "{{ if isAdmin }}Admin{{ elif isModerator }}Mod{{ elif isUser }}User{{ else }}Guest{{ endif }}",
+			content: "{{ if isAdmin }}Admin{{ elif !(isModerator && 'dobby')}}Mod{{ elif isUser }}User{{ else }}Guest{{ endif }}",
 			context: map[string]interface{}{
-				"isAdmin":     true,
-				"isModerator": true,
+				"isAdmin":     false,
+				"isModerator": false,
 				"isUser":      true,
 			},
-			expected: "Admin",
+			expected: "Mod",
 		},
 		{
 			name:    "Multiple elif branches with middle true",
