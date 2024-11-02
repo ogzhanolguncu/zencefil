@@ -6,6 +6,26 @@ Zencefil is a sophisticated template engine written in Go, designed to provide f
 
 Zencefil (Turkish for "ginger") is a template engine implemented in Go that supports a rich set of features for text manipulation and dynamic content generation. While created as a learning project, it offers robust functionality similar to established template engines like Jinja2 or Django templates.
 
+## Performance
+
+Zencefil is designed for high performance, showing significant speed advantages over similar template engines. Here's a comparison with Jinja2 (Python) across different operations:
+
+| Operation             | Zencefil    | Jinja2      | Performance Difference |
+| --------------------- | ----------- | ----------- | ---------------------- |
+| Simple text           | 75 ns/op    | 4,881 ns/op | ~65x faster            |
+| Variable substitution | 187 ns/op   | 5,286 ns/op | ~28x faster            |
+| Nested object access  | 356 ns/op   | 6,162 ns/op | ~17x faster            |
+| Complex conditions    | 1,013 ns/op | 5,338 ns/op | ~5x faster             |
+| Simple loop           | 940 ns/op   | 5,664 ns/op | ~6x faster             |
+| Complex loop          | 1,614 ns/op | 8,445 ns/op | ~5x faster             |
+
+_Benchmark details:_
+
+- Each operation tested with 1000 iterations after 100 warmup iterations
+- Tests run on the same machine under identical conditions
+- Zencefil maintains sub-millisecond performance even for complex operations
+- Performance advantage is most pronounced in simple operations while remaining significant in complex scenarios
+
 ## Features
 
 ### Variable Substitution
