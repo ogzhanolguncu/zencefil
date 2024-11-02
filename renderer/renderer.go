@@ -100,6 +100,13 @@ func (r *Renderer) renderNode(node parser.Node) (string, error) {
 		}
 		return fmt.Sprintf("%v", variable), nil
 
+	case parser.EXPRESSION_NODE:
+		expr, err := r.evaluateExpression(node)
+		if err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("%v", expr), nil
+
 	case parser.IF_NODE:
 		return r.renderIfNode(node)
 
@@ -198,7 +205,7 @@ func (r *Renderer) renderIfNode(node parser.Node) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		if condition {
+		if isTruthy(condition) {
 			return r.renderConditionalBranch(node.Children, parser.THEN_BRANCH)
 		}
 	}
@@ -248,7 +255,7 @@ func (r *Renderer) renderElifBranches(nodes []parser.Node) (string, error) {
 					return "", err
 				}
 
-				if condition {
+				if isTruthy(condition) {
 					return r.renderNodes(elifNode.Children)
 				}
 			}
@@ -286,7 +293,7 @@ func (r *Renderer) evaluateCondition(key string) (bool, error) {
 	return boolVal, nil
 }
 
-func (r *Renderer) evaluateExpression(node parser.Node) (bool, error) {
+func (r *Renderer) evaluateExpression(node parser.Node) (interface{}, error) {
 	var operandStack []interface{}
 	var operatorStack []parser.NodeType
 
@@ -356,7 +363,7 @@ func (r *Renderer) evaluateExpression(node parser.Node) (bool, error) {
 		return false, fmt.Errorf("invalid expression: expected 1 final result, got %d", len(operandStack))
 	}
 
-	return isTruthy(operandStack[0]), nil
+	return operandStack[0], nil
 }
 
 func (r *Renderer) variableLookup(key string) (interface{}, bool) {
@@ -498,13 +505,23 @@ func evaluateTopOperator(operandStack *[]interface{}, operatorStack *[]parser.No
 	left := (*operandStack)[len(*operandStack)-2]
 	*operandStack = (*operandStack)[:len(*operandStack)-2]
 
-	var result bool
+	var result interface{}
 
 	switch op {
 	case parser.OP_AND:
-		result = isTruthy(left) && isTruthy(right)
+		// If left is falsy, return left, otherwise return right
+		if !isTruthy(left) {
+			result = left
+		} else {
+			result = right
+		}
 	case parser.OP_OR:
-		result = isTruthy(left) || isTruthy(right)
+		// If left is truthy, return left, otherwise return right
+		if isTruthy(left) {
+			result = left
+		} else {
+			result = right
+		}
 	case parser.OP_EQUALS:
 		result = compareValues(left, right) == 0
 	case parser.OP_NOT_EQUALS:

@@ -51,16 +51,23 @@ func TestRenderer(t *testing.T) {
 			expected: "Value: special value",
 		},
 		{
-			name:    "Variable with different types",
-			content: "Number: {{ num }}, Bool: {{ bool }}, Nil: {{ nilVar }}",
+			name:    "Multiple complex expressions in single line",
+			content: "{{ isAdmin || isModerator && isActive }}|{{ isVIP && userName || 'Guest' }}|{{ (isAdmin || isModerator) && !isBlocked }}|{{ (role == 'admin' || role == 'mod') && isActive }}|{{ isLoggedIn && (isAdmin && 'Admin' || 'User') || 'Anonymous' }}|{{ !isBanned && (verificationLevel > 2 || isTrusted) }}",
 			context: map[string]interface{}{
-				"num":    42,
-				"bool":   true,
-				"nilVar": nil,
+				"isAdmin":           true,
+				"isModerator":       false,
+				"isActive":          true,
+				"isVIP":             true,
+				"userName":          "John",
+				"isBlocked":         false,
+				"role":              "admin",
+				"isLoggedIn":        true,
+				"isBanned":          false,
+				"verificationLevel": 3,
+				"isTrusted":         true,
 			},
-			expected: "Number: 42, Bool: true, Nil: <nil>",
+			expected: "true|John|true|true|Admin|true",
 		},
-
 		// Conditional tests
 		{
 			name: "Complex nested",
