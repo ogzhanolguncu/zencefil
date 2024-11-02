@@ -221,8 +221,11 @@ func (r *Renderer) renderElifBranches(nodes []parser.Node) (string, error) {
 		}
 
 		for _, elifNode := range node.Children {
-			conditionNode, elifNodeChildren, _ := getFirst(elifNode.Children)
-			elifNode.Children = elifNodeChildren
+			// First element in the 'if', 'elif' nodes is condition node.
+			// But, we have to delete the first item from node children to evaluate the rest of it.
+			// Otherwise when we call 'renderNode', the condition will be treated as 'VARIABLE_NODE'.
+			conditionNode := elifNode.Children[0]
+			elifNode.Children = elifNode.Children[1:]
 
 			if conditionNode.Type != parser.VARIABLE_NODE && conditionNode.Type != parser.EXPRESSION_NODE {
 				return "", &RenderError{Message: "elif node has nil condition", Node: node}
@@ -356,66 +359,49 @@ func (r *Renderer) evaluateExpression(node parser.Node) (bool, error) {
 	return isTruthy(operandStack[0]), nil
 }
 
-func applyPendingBang(operandStack *[]interface{}, operatorStack *[]parser.NodeType) {
-	if len(*operatorStack) > 0 && (*operatorStack)[len(*operatorStack)-1] == parser.OP_BANG {
-		*operatorStack = (*operatorStack)[:len(*operatorStack)-1]
-		lastIdx := len(*operandStack) - 1
-		(*operandStack)[lastIdx] = !isTruthy((*operandStack)[lastIdx])
+func (r *Renderer) variableLookup(key string) (interface{}, bool) {
+	value, exists := r.Context[key]
+	return value, exists
+}
+
+// HELPERS
+func isTruthy(v interface{}) bool {
+	switch v := v.(type) {
+	case nil:
+		return false
+	case bool:
+		return v
+	case string:
+		return v != ""
+	case int:
+		return v != 0
+	case float64:
+		return v != 0
+	case []interface{}:
+		return len(v) > 0
+	case map[string]interface{}:
+		return len(v) > 0
+	default:
+		return true
 	}
 }
 
-func evaluateTopOperator(operandStack *[]interface{}, operatorStack *[]parser.NodeType) error {
-	if len(*operatorStack) < 1 {
-		return fmt.Errorf("invalid expression: no operator")
-	}
-
-	op := (*operatorStack)[len(*operatorStack)-1]
-	*operatorStack = (*operatorStack)[:len(*operatorStack)-1]
-
-	// Handle unary NOT operator
-	if op == parser.OP_BANG {
-		if len(*operandStack) < 1 {
-			return fmt.Errorf("invalid expression: not enough operands for NOT operator")
-		}
-		lastIdx := len(*operandStack) - 1
-		(*operandStack)[lastIdx] = !isTruthy((*operandStack)[lastIdx])
-		return nil
-	}
-
-	// Handle binary operators
-	if len(*operandStack) < 2 {
-		return fmt.Errorf("invalid expression: not enough operands")
-	}
-
-	right := (*operandStack)[len(*operandStack)-1]
-	left := (*operandStack)[len(*operandStack)-2]
-	*operandStack = (*operandStack)[:len(*operandStack)-2]
-
-	var result bool
-
-	switch op {
-	case parser.OP_AND:
-		result = isTruthy(left) && isTruthy(right)
-	case parser.OP_OR:
-		result = isTruthy(left) || isTruthy(right)
-	case parser.OP_EQUALS:
-		result = compareValues(left, right) == 0
-	case parser.OP_NOT_EQUALS:
-		result = compareValues(left, right) != 0
-	case parser.OP_GT:
-		result = compareValues(left, right) > 0
-	case parser.OP_LT:
-		result = compareValues(left, right) < 0
-	case parser.OP_GTE:
-		result = compareValues(left, right) >= 0
-	case parser.OP_LTE:
-		result = compareValues(left, right) <= 0
+// Helper function to convert various numeric types to float64
+func toFloat64(v interface{}) (float64, bool) {
+	switch v := v.(type) {
+	case float64:
+		return v, true
+	case float32:
+		return float64(v), true
+	case int:
+		return float64(v), true
+	case int64:
+		return float64(v), true
+	case int32:
+		return float64(v), true
 	default:
-		return fmt.Errorf("unsupported operator: %v", op)
+		return 0, false
 	}
-
-	*operandStack = append(*operandStack, result)
-	return nil
 }
 
 func compareValues(a, b interface{}) int {
@@ -477,54 +463,64 @@ func compareValues(a, b interface{}) int {
 	return strings.Compare(fmt.Sprintf("%v", a), fmt.Sprintf("%v", b))
 }
 
-func (r *Renderer) variableLookup(key string) (interface{}, bool) {
-	value, exists := r.Context[key]
-	return value, exists
-}
-
-// HELPERS
-func getFirst[T any](slice []T) (first T, rest []T, ok bool) {
-	if len(slice) == 0 {
-		return first, rest, false
+func applyPendingBang(operandStack *[]interface{}, operatorStack *[]parser.NodeType) {
+	if len(*operatorStack) > 0 && (*operatorStack)[len(*operatorStack)-1] == parser.OP_BANG {
+		*operatorStack = (*operatorStack)[:len(*operatorStack)-1]
+		lastIdx := len(*operandStack) - 1
+		(*operandStack)[lastIdx] = !isTruthy((*operandStack)[lastIdx])
 	}
-	return slice[0], slice[1:], true
 }
 
-func isTruthy(v interface{}) bool {
-	switch v := v.(type) {
-	case nil:
-		return false
-	case bool:
-		return v
-	case string:
-		return v != ""
-	case int:
-		return v != 0
-	case float64:
-		return v != 0
-	case []interface{}:
-		return len(v) > 0
-	case map[string]interface{}:
-		return len(v) > 0
+func evaluateTopOperator(operandStack *[]interface{}, operatorStack *[]parser.NodeType) error {
+	if len(*operatorStack) < 1 {
+		return fmt.Errorf("invalid expression: no operator")
+	}
+
+	op := (*operatorStack)[len(*operatorStack)-1]
+	*operatorStack = (*operatorStack)[:len(*operatorStack)-1]
+
+	// Handle unary NOT operator
+	if op == parser.OP_BANG {
+		if len(*operandStack) < 1 {
+			return fmt.Errorf("invalid expression: not enough operands for NOT operator")
+		}
+		lastIdx := len(*operandStack) - 1
+		(*operandStack)[lastIdx] = !isTruthy((*operandStack)[lastIdx])
+		return nil
+	}
+
+	// Handle binary operators
+	if len(*operandStack) < 2 {
+		return fmt.Errorf("invalid expression: not enough operands")
+	}
+
+	right := (*operandStack)[len(*operandStack)-1]
+	left := (*operandStack)[len(*operandStack)-2]
+	*operandStack = (*operandStack)[:len(*operandStack)-2]
+
+	var result bool
+
+	switch op {
+	case parser.OP_AND:
+		result = isTruthy(left) && isTruthy(right)
+	case parser.OP_OR:
+		result = isTruthy(left) || isTruthy(right)
+	case parser.OP_EQUALS:
+		result = compareValues(left, right) == 0
+	case parser.OP_NOT_EQUALS:
+		result = compareValues(left, right) != 0
+	case parser.OP_GT:
+		result = compareValues(left, right) > 0
+	case parser.OP_LT:
+		result = compareValues(left, right) < 0
+	case parser.OP_GTE:
+		result = compareValues(left, right) >= 0
+	case parser.OP_LTE:
+		result = compareValues(left, right) <= 0
 	default:
-		return true
+		return fmt.Errorf("unsupported operator: %v", op)
 	}
-}
 
-// Helper function to convert various numeric types to float64
-func toFloat64(v interface{}) (float64, bool) {
-	switch v := v.(type) {
-	case float64:
-		return v, true
-	case float32:
-		return float64(v), true
-	case int:
-		return float64(v), true
-	case int64:
-		return float64(v), true
-	case int32:
-		return float64(v), true
-	default:
-		return 0, false
-	}
+	*operandStack = append(*operandStack, result)
+	return nil
 }
